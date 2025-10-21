@@ -7,8 +7,8 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.data.FullReadingData
 import cz.davidfryda.odectyapp.data.UserData
-import cz.davidfryda.odectyapp.ui.main.Meter
-import cz.davidfryda.odectyapp.ui.main.Reading
+import cz.davidfryda.odectyapp.data.Meter
+import cz.davidfryda.odectyapp.data.Reading
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat

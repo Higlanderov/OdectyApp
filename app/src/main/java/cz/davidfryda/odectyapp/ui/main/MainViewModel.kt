@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.ui.user.SaveResult
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await

@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import cz.davidfryda.odectyapp.R
+import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.ListItemMeterBinding
 import cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragmentDirections
 

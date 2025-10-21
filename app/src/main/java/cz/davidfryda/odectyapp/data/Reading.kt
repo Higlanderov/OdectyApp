@@ -1,4 +1,4 @@
-package cz.davidfryda.odectyapp.ui.main
+package cz.davidfryda.odectyapp.data
 
 import com.google.firebase.firestore.ServerTimestamp
 import java.util.Date

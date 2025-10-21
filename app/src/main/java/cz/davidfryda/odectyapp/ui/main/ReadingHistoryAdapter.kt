@@ -10,6 +10,7 @@ import cz.davidfryda.odectyapp.databinding.ListItemReadingBinding
 import java.text.SimpleDateFormat
 import java.util.Locale
 import androidx.core.view.isVisible
+import cz.davidfryda.odectyapp.data.Reading
 
 class ReadingHistoryAdapter : ListAdapter<Reading, ReadingHistoryAdapter.ReadingViewHolder>(ReadingDiffCallback()) {
 

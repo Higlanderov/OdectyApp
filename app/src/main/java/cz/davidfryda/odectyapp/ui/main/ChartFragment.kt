@@ -16,6 +16,7 @@ import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.R
+import cz.davidfryda.odectyapp.data.Reading
 import cz.davidfryda.odectyapp.databinding.FragmentChartBinding
 import java.text.SimpleDateFormat
 import java.util.Locale

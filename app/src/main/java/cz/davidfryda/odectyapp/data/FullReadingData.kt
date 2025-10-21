@@ -1,7 +1,7 @@
 package cz.davidfryda.odectyapp.data
 
-import cz.davidfryda.odectyapp.ui.main.Meter
-import cz.davidfryda.odectyapp.ui.main.Reading
+import cz.davidfryda.odectyapp.data.Meter
+import cz.davidfryda.odectyapp.data.Reading
 
 data class FullReadingData(
     val user: UserData,
