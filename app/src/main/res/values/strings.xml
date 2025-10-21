@@ -1,0 +1,47 @@
+<resources>
+    <string name="app_name">Odecty</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+
+    <!-- TENTO ŘÁDEK JE OPRAVENÝ -->
+    <string name="empty_main_view_text">Zatím nemáte přidané žádné měřáky.\nZačněte kliknutím na tlačítko +.</string>
+
+    <string name="add_meter">Přidat měřák</string>
+    <string name="meter_icon_description">Ikona měřiče</string>
+    <string name="take_reading_button">Provést nový odečet</string>
+    <string name="master_user_detail_no_meters">Tento uživatel zatím nemá přidané žádné měřáky.</string>
+    <string name="search_by_name_address">Hledat (jméno, adresa)...</string>
+    <string name="month">Měsíc</string>
+    <string name="reading_status">Status odečtu</string>
+    <string name="apply">Aplikovat</string>
+    <string name="reset">Reset</string>
+    <string name="show_filter">Zobrazit Filtr</string>
+    <string name="hide_filter">Skrýt Filtr</string>
+    <string name="export_data">Exportovat data</string>
+    <string name="new_reading_value">Nová hodnota odečtu</string>
+    <string name="click_for_detail">Klikněte pro detail</string>
+    <string name="export_format_title">Vyberte formát exportu</string>
+
+    <!-- Dialog Add Meter -->
+    <string name="meter_name_hint">Název měřáku</string>
+    <string name="meter_type_electricity">Elektřina</string>
+    <string name="meter_type_gas">Plyn</string>
+    <string name="meter_type_water">Voda</string>
+    <string name="dialog_cancel">Zrušit</string>
+    <string name="dialog_save">Uložit</string>
+
+    <string-array name="months_array">
+        <item>Leden</item>
+        <item>Únor</item>
+        <item>Březen</item>
+        <item>Duben</item>
+        <item>Květen</item>
+        <item>Červen</item>
+        <item>Červenec</item>
+        <item>Srpen</item>
+        <item>Září</item>
+        <item>Říjen</item>
+        <item>Listopad</item>
+        <item>Prosinec</item>
+    </string-array>
+</resources>

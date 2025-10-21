@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/splashFragment">
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="cz.davidfryda.odectyapp.ui.auth.LoginFragment"
+        android:label="Přihlášení"
+        tools:layout="@layout/fragment_login">
+        <action
+            android:id="@+id/action_loginFragment_to_registerFragment"
+            app:destination="@id/registerFragment" />
+        <action
+            android:id="@+id/action_loginFragment_to_mainFragment"
+            app:destination="@id/mainFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_loginFragment_to_masterUserListFragment"
+            app:destination="@id/masterUserListFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_loginFragment_to_userInfoFragment"
+            app:destination="@id/userInfoFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/registerFragment"
+        android:name="cz.davidfryda.odectyapp.ui.auth.RegisterFragment"
+        android:label="Registrace"
+        tools:layout="@layout/fragment_register">
+        <action
+            android:id="@+id/action_registerFragment_to_loginFragment"
+            app:destination="@id/loginFragment" />
+        <action
+            android:id="@+id/action_registerFragment_to_userInfoFragment"
+            app:destination="@id/userInfoFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_registerFragment_to_mainFragment"
+            app:destination="@id/mainFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_registerFragment_to_masterUserListFragment"
+            app:destination="@id/masterUserListFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+    </fragment>
+    <fragment
+        android:id="@+id/splashFragment"
+        android:name="cz.davidfryda.odectyapp.SplashFragment"
+        android:label=""
+        tools:layout="@layout/fragment_splash" >
+        <action
+            android:id="@+id/action_splashFragment_to_loginFragment"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/splashFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_splashFragment_to_mainFragment"
+            app:destination="@id/mainFragment"
+            app:popUpTo="@id/splashFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_splashFragment_to_masterUserListFragment"
+            app:destination="@id/masterUserListFragment"
+            app:popUpTo="@id/splashFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+    <fragment
+        android:id="@+id/userInfoFragment"
+        android:name="cz.davidfryda.odectyapp.ui.user.UserInfoFragment"
+        android:label="Doplnění údajů"
+        tools:layout="@layout/fragment_user_info" >
+        <action
+            android:id="@+id/action_userInfoFragment_to_mainFragment"
+            app:destination="@id/mainFragment"
+            app:popUpTo="@id/nav_graph"
+            app:popUpToInclusive="true" />
+    </fragment>
+    <fragment
+        android:id="@+id/mainFragment"
+        android:name="cz.davidfryda.odectyapp.ui.main.MainFragment"
+        android:label="Moje Měřáky"
+        tools:layout="@layout/fragment_main" >
+        <action
+            android:id="@+id/action_mainFragment_to_meterDetailFragment"
+            app:destination="@id/meterDetailFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/meterDetailFragment"
+        android:name="cz.davidfryda.odectyapp.ui.main.MeterDetailFragment"
+        android:label="Detail Měřáku"
+        tools:layout="@layout/fragment_meter_detail" >
+        <argument
+            android:name="meterId"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_meterDetailFragment_to_chartFragment"
+            app:destination="@id/chartFragment" />
+        <action
+            android:id="@+id/action_meterDetailFragment_to_readingDetailFragment"
+            app:destination="@id/readingDetailFragment" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+    </fragment>
+    <fragment
+        android:id="@+id/chartFragment"
+        android:name="cz.davidfryda.odectyapp.ui.main.ChartFragment"
+        android:label="Graf Spotřeby"
+        tools:layout="@layout/fragment_chart" >
+        <argument
+            android:name="meterId"
+            app:argType="string" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+    </fragment>
+    <fragment
+        android:id="@+id/readingDetailFragment"
+        android:name="cz.davidfryda.odectyapp.ui.main.ReadingDetailFragment"
+        android:label="Detail Odečtu"
+        tools:layout="@layout/fragment_reading_detail" >
+        <argument
+            android:name="readingId"
+            app:argType="string" />
+        <argument
+            android:name="meterType"
+            app:argType="string"
+            android:defaultValue="Obecný" />
+        <argument
+            android:name="isMasterView"
+            app:argType="boolean"
+            android:defaultValue="false" />
+    </fragment>
+    <action android:id="@+id/action_global_splashFragment"
+        app:destination="@id/splashFragment"
+        app:popUpTo="@id/nav_graph"
+        app:popUpToInclusive="true"/>
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="cz.davidfryda.odectyapp.ui.profile.ProfileFragment"
+        android:label="Profil"
+        tools:layout="@layout/fragment_profile" />
+    <fragment
+        android:id="@+id/masterUserListFragment"
+        android:name="cz.davidfryda.odectyapp.ui.master.MasterUserListFragment"
+        android:label="Správa uživatelů"
+        tools:layout="@layout/fragment_master_user_list" >
+        <action
+            android:id="@+id/action_masterUserListFragment_to_masterUserDetailFragment"
+            app:destination="@id/masterUserDetailFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/masterUserDetailFragment"
+        android:name="cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragment"
+        android:label="Přehled uživatele"
+        tools:layout="@layout/fragment_master_user_detail" >
+        <argument
+            android:name="userId"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_masterUserDetailFragment_to_meterDetailFragment"
+            app:destination="@id/meterDetailFragment" />
+    </fragment>
+</navigation>
+

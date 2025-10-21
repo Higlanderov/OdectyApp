@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "945101370255",
+    "firebase_url": "https://odecty-a5b6a-default-rtdb.firebaseio.com",
+    "project_id": "odecty-a5b6a",
+    "storage_bucket": "odecty-a5b6a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:945101370255:android:fd2173e9e41ff8cb0fd1fa",
+        "android_client_info": {
+          "package_name": "cz.davidfryda.odectyapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "945101370255-k3iock9733qn2pcucbhhvl9vrtborda8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "cz.davidfryda.odectyapp",
+            "certificate_hash": "cdf5efa443a4ac6c2bd505da37b2151e6fc40868"
+          }
+        },
+        {
+          "client_id": "945101370255-cbjrc6423gvvqkuf5gn83h994bb33ul3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOYMwpESEvJ8P7-ilhEruzl1A-mM0Dygw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "945101370255-cbjrc6423gvvqkuf5gn83h994bb33ul3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

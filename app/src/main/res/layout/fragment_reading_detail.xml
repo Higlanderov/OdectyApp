@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    tools:context=".ui.main.ReadingDetailFragment">
+
+    <ImageView
+        android:id="@+id/readingPhoto"
+        android:layout_width="0dp"
+        android:layout_height="300dp"
+        android:scaleType="centerCrop"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:src="@tools:sample/backgrounds/scenic"
+        android:contentDescription="Fotografie odečtu"/>
+
+    <TextView
+        android:id="@+id/readingValueLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hodnota odečtu:"
+        android:layout_marginTop="24dp"
+        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/readingPhoto"/>
+
+    <TextView
+        android:id="@+id/readingValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="12345.67"
+        android:layout_marginStart="8dp"
+        android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
+        app:layout_constraintStart_toEndOf="@id/readingValueLabel"
+        app:layout_constraintBaseline_toBaselineOf="@id/readingValueLabel"/>
+
+    <TextView
+        android:id="@+id/readingDateLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Datum:"
+        android:layout_marginTop="16dp"
+        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/readingValueLabel"/>
+
+    <TextView
+        android:id="@+id/readingDate"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        tools:text="17. 10. 2025 20:20"
+        android:layout_marginStart="8dp"
+        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+        app:layout_constraintStart_toEndOf="@id/readingDateLabel"
+        app:layout_constraintBaseline_toBaselineOf="@id/readingDateLabel"/>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/editButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Upravit hodnotu"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
