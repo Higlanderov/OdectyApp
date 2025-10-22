@@ -2,6 +2,7 @@ package cz.davidfryda.odectyapp.ui.notifications
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -27,6 +28,9 @@ class NotificationAdapter : ListAdapter<NotificationItem, NotificationAdapter.No
         fun bind(item: NotificationItem) {
             binding.notificationMessage.text = item.message
             binding.notificationTimestamp.text = item.timestamp?.let { sdf.format(it) } ?: "Právě teď"
+
+            binding.unreadIndicator.isVisible = !item.read
+
         }
     }
 
