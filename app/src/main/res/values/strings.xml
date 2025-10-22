@@ -21,6 +21,9 @@
     <string name="new_reading_value">Nová hodnota odečtu</string>
     <string name="click_for_detail">Klikněte pro detail</string>
     <string name="export_format_title">Vyberte formát exportu</string>
+    <string name="status_waiting_for_sync">Čeká na synchronizaci</string>
+    <string name="edited_by_admin">Upraveno správcem</string>
+    <string name="reading_value_with_unit">%1$s %2$s</string>
 
     <!-- Dialog Add Meter -->
     <string name="meter_name_hint">Název měřáku</string>

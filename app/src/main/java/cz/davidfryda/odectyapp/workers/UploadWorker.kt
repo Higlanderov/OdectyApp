@@ -2,6 +2,7 @@ package cz.davidfryda.odectyapp.workers
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.google.firebase.firestore.FieldValue
@@ -52,6 +53,7 @@ class UploadWorker(appContext: Context, workerParams: WorkerParameters) :
 
             Result.success()
         } catch (e: Exception) {
+            Log.e("UploadWorker", "Chyba při nahrávání offline odečtu.", e)
             // Pokud nahrávání selže, zkusíme to příště znovu
             Result.retry()
         }

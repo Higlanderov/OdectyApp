@@ -7,9 +7,9 @@ import androidx.navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Reading
 import cz.davidfryda.odectyapp.databinding.ListItemReadingBinding
-import cz.davidfryda.odectyapp.ui.main.MeterDetailFragmentDirections
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -39,8 +39,8 @@ class ReadingHistoryAdapter : ListAdapter<Reading, ReadingHistoryAdapter.Reading
                 "Elektřina" -> "kWh"
                 else -> ""
             }
-            binding.readingValue.text = "${reading.finalValue} $unit"
-            binding.readingDate.text = reading.timestamp?.let { dateFormat.format(it) } ?: "Čeká na synchronizaci"
+            binding.readingValue.text = itemView.context.getString(R.string.reading_value_with_unit, reading.finalValue.toString(), unit)
+            binding.readingDate.text = reading.timestamp?.let { dateFormat.format(it) } ?: itemView.context.getString(R.string.status_waiting_for_sync)
 
             // Zobrazíme ikonu, pokud odečet není synchronizovaný
             binding.syncStatusIcon.isVisible = !reading.isSynced

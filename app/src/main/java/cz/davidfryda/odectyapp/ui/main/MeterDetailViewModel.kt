@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -102,6 +103,7 @@ class MeterDetailViewModel : ViewModel() {
                 db.collection("readings").add(readingData).await()
                 _uploadResult.value = UploadResult.Success
             } catch (e: Exception) {
+                Log.e("MeterDetailViewModel", "Chyba při nahrávání online.", e)
                 _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při nahrávání.")
             }
         }
@@ -130,7 +132,8 @@ class MeterDetailViewModel : ViewModel() {
                 WorkManager.getInstance(context).enqueue(uploadWorkRequest)
                 _uploadResult.value = UploadResult.Success
             } catch (e: Exception) {
-                _uploadResult.value = UploadResult.Error("Chyba při ukládání pro offline použití.")
+                Log.e("MeterDetailViewModel", "Chyba při ukládání pro offline použití.", e)
+                _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při ukládání pro offline použití.")
             }
         }
     }
@@ -178,6 +181,7 @@ class MeterDetailViewModel : ViewModel() {
                     .await()
                 _updateResult.value = UploadResult.Success
             } catch (e: Exception) {
+                Log.e("MeterDetailViewModel", "Chyba při aktualizaci.", e)
                 _updateResult.value = UploadResult.Error(e.message ?: "Chyba při aktualizaci.")
             }
         }

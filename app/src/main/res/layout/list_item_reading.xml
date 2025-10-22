@@ -15,7 +15,7 @@
         android:visibility="gone"
         tools:visibility="visible"
         android:layout_marginEnd="8dp"
-        android:contentDescription="Čeká na synchronizaci"/>
+        android:contentDescription="@string/status_waiting_for_sync"/>
 
     <TextView
         android:id="@+id/readingDate"
@@ -33,7 +33,7 @@
         android:visibility="gone"
         tools:visibility="visible"
         android:layout_marginEnd="4dp"
-        android:contentDescription="Upraveno správcem"/>
+        android:contentDescription="@string/edited_by_admin"/>
 
     <TextView
         android:id="@+id/readingValue"
