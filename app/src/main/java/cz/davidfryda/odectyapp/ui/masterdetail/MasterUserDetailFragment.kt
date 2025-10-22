@@ -9,6 +9,7 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.navArgs
 import cz.davidfryda.odectyapp.databinding.FragmentMasterUserDetailBinding
 import cz.davidfryda.odectyapp.ui.main.MeterAdapter
+import cz.davidfryda.odectyapp.ui.master.MasterUserDetailViewModel
 
 class MasterUserDetailFragment : Fragment() {
     private var _binding: FragmentMasterUserDetailBinding? = null

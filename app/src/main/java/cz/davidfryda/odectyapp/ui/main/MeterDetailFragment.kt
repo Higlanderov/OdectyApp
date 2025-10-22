@@ -4,14 +4,15 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Button
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
@@ -22,7 +23,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.DividerItemDecoration
 import coil.load
-import com.google.android.material.dialog.MaterialAlertDialogBuilder // DŮLEŽITÝ NOVÝ IMPORT
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.R
@@ -67,16 +68,22 @@ class MeterDetailFragment : Fragment() {
             Firebase.auth.currentUser!!.uid
         }
 
-        val isLoggedInUser = (targetUserId == Firebase.auth.currentUser!!.uid)
-        binding.takeReadingButton.isVisible = isLoggedInUser
+        // ZMĚNA: Voláme novou inicializační metodu
+        viewModel.initializeForUser(targetUserId, args.meterId, requireContext())
 
         setupRecyclerView()
+
+        val isLoggedInUser = (targetUserId == Firebase.auth.currentUser!!.uid)
+        binding.takeReadingButton.isVisible = isLoggedInUser
 
         val isMasterView = !isLoggedInUser
         historyAdapter.isMasterView = isMasterView
 
         viewModel.loadMeterDetails(targetUserId, args.meterId)
-        viewModel.loadReadingHistory(targetUserId, args.meterId)
+
+        viewModel.readingHistory.observe(viewLifecycleOwner) { history ->
+            historyAdapter.submitList(history)
+        }
 
         binding.takeReadingButton.setOnClickListener {
             requestCameraPermission()
@@ -93,24 +100,15 @@ class MeterDetailFragment : Fragment() {
             historyAdapter.notifyDataSetChanged()
         }
 
-        viewModel.readingHistory.observe(viewLifecycleOwner) { history ->
-            historyAdapter.submitList(history)
-        }
-
         viewModel.uploadResult.observe(viewLifecycleOwner) { result ->
             binding.progressBar.isVisible = result is UploadResult.Loading
             if(binding.takeReadingButton.isVisible) {
                 binding.takeReadingButton.isEnabled = result !is UploadResult.Loading
             }
-
-            when (result) {
-                is UploadResult.Success -> {
-                    Toast.makeText(requireContext(), "Odečet úspěšně nahrán!", Toast.LENGTH_SHORT).show()
-                }
-                is UploadResult.Error -> {
-                    Toast.makeText(requireContext(), "Chyba nahrávání: ${result.message}", Toast.LENGTH_LONG).show()
-                }
-                is UploadResult.Loading -> { /* ProgressBar se točí */ }
+            if (result is UploadResult.Success) {
+                Toast.makeText(requireContext(), "Odečet úspěšně zpracován!", Toast.LENGTH_SHORT).show()
+            } else if (result is UploadResult.Error) {
+                Toast.makeText(requireContext(), "Chyba: ${result.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -132,35 +130,30 @@ class MeterDetailFragment : Fragment() {
 
         photoPreview.load(photoUri)
 
-        // Vytvoříme dialog, ale zatím ho nezobrazíme
         val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle("Zadat hodnotu odečtu")
             .setView(dialogView)
             .setCancelable(false)
             .create()
 
-        // Nastavíme logiku pro naše vlastní tlačítko "Uložit"
         saveButton.setOnClickListener {
             val valueString = editText.text.toString()
             val valueDouble = valueString.toDoubleOrNull()
 
             if (valueDouble != null) {
-                viewModel.saveReading(targetUserId, args.meterId, photoUri, valueDouble)
-                dialog.dismiss() // Zavřeme dialog
+                // ZMĚNA: Předáváme i context
+                viewModel.saveReading(targetUserId, args.meterId, photoUri, valueDouble, requireContext())
+                dialog.dismiss()
             } else {
                 Toast.makeText(context, "Prosím, zadejte platnou číselnou hodnotu.", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // Nastavíme logiku pro naše vlastní tlačítko "Zrušit"
         cancelButton.setOnClickListener {
-            dialog.dismiss() // Jen zavřeme dialog
+            dialog.dismiss()
         }
-
-        // Až teď dialog zobrazíme
         dialog.show()
     }
-
 
     private fun requestCameraPermission() {
         when {

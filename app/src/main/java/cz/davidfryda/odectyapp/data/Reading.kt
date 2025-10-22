@@ -12,5 +12,6 @@ data class Reading(
     @ServerTimestamp
     val timestamp: Date? = null,
     // NOVÉ POLE:
-    val editedByAdmin: Boolean = false
+    val editedByAdmin: Boolean = false,
+    val isSynced: Boolean = true // Nový příznak
 )

@@ -2,21 +2,22 @@ package cz.davidfryda.odectyapp.ui.main
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import cz.davidfryda.odectyapp.data.Reading
 import cz.davidfryda.odectyapp.databinding.ListItemReadingBinding
+import cz.davidfryda.odectyapp.ui.main.MeterDetailFragmentDirections
 import java.text.SimpleDateFormat
 import java.util.Locale
-import androidx.core.view.isVisible
-import cz.davidfryda.odectyapp.data.Reading
 
 class ReadingHistoryAdapter : ListAdapter<Reading, ReadingHistoryAdapter.ReadingViewHolder>(ReadingDiffCallback()) {
 
     private val dateFormat = SimpleDateFormat("dd. MM. yyyy HH:mm", Locale.getDefault())
     var meterType: String? = null
-    var isMasterView: Boolean = false // Nová proměnná
+    var isMasterView: Boolean = false
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ReadingViewHolder {
         val binding = ListItemReadingBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -39,22 +40,29 @@ class ReadingHistoryAdapter : ListAdapter<Reading, ReadingHistoryAdapter.Reading
                 else -> ""
             }
             binding.readingValue.text = "${reading.finalValue} $unit"
-            binding.readingDate.text = reading.timestamp?.let { dateFormat.format(it) } ?: "Chybí datum"
+            binding.readingDate.text = reading.timestamp?.let { dateFormat.format(it) } ?: "Čeká na synchronizaci"
 
-            // Zobrazíme ikonu, pokud je to potřeba
+            // Zobrazíme ikonu, pokud odečet není synchronizovaný
+            binding.syncStatusIcon.isVisible = !reading.isSynced
+
             binding.adminEditIcon.isVisible = reading.editedByAdmin
 
+            // Kliknutí povolíme jen na synchronizované odečty
+            itemView.isClickable = reading.isSynced
             itemView.setOnClickListener {
-                val action = MeterDetailFragmentDirections.actionMeterDetailFragmentToReadingDetailFragment(
-                    readingId = reading.id,
-                    meterType = meterType ?: "Obecný",
-                    isMasterView = isMasterView
-                )
-                itemView.findNavController().navigate(action)
+                if (reading.isSynced) {
+                    val action = MeterDetailFragmentDirections.actionMeterDetailFragmentToReadingDetailFragment(
+                        readingId = reading.id,
+                        meterType = meterType ?: "Obecný",
+                        isMasterView = isMasterView
+                    )
+                    itemView.findNavController().navigate(action)
+                }
             }
         }
     }
 }
+
 class ReadingDiffCallback : DiffUtil.ItemCallback<Reading>() {
     override fun areItemsTheSame(oldItem: Reading, newItem: Reading): Boolean = oldItem.id == newItem.id
     override fun areContentsTheSame(oldItem: Reading, newItem: Reading): Boolean = oldItem == newItem

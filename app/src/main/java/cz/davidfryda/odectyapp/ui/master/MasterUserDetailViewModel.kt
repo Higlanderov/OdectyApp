@@ -1,4 +1,4 @@
-package cz.davidfryda.odectyapp.ui.masterdetail
+package cz.davidfryda.odectyapp.ui.master
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData

@@ -43,7 +43,7 @@ class ChartFragment : Fragment() {
         }
 
         // Voláme ViewModel se správným userId
-        viewModel.loadReadingHistory(targetUserId, args.meterId)
+        viewModel.initializeForUser(targetUserId, args.meterId, requireContext())
 
         viewModel.readingHistory.observe(viewLifecycleOwner) { history ->
             // KLÍČOVÁ LOGIKA: Zkontrolujeme, jestli máme dostatek dat

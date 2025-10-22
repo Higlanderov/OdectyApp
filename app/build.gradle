@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace 'cz.davidfryda.odectyapp'
-    compileSdk 36
+    compileSdk 34
 
     defaultConfig {
         applicationId "cz.davidfryda.odectyapp"
         minSdk 26
-        targetSdk 36
+        targetSdk 34
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
