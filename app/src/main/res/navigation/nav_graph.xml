@@ -173,5 +173,10 @@
             android:id="@+id/action_masterUserDetailFragment_to_meterDetailFragment"
             app:destination="@id/meterDetailFragment" />
     </fragment>
+    <dialog
+        android:id="@+id/notificationListFragment"
+        android:name="cz.davidfryda.odectyapp.ui.notifications.NotificationListFragment"
+        android:label="fragment_notification_list"
+        tools:layout="@layout/fragment_notification_list" />
 </navigation>
 
