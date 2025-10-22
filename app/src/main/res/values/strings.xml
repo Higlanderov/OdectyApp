@@ -24,6 +24,10 @@
     <string name="status_waiting_for_sync">Čeká na synchronizaci</string>
     <string name="edited_by_admin">Upraveno správcem</string>
     <string name="reading_value_with_unit">%1$s %2$s</string>
+    <string name="warning_dialog_title">Pozor, možná chyba</string>
+    <string name="warning_dialog_message_default">Nová hodnota je o více než 100% vyšší než poslední odečet. Jste si jistý/á?</string>
+    <string name="warning_dialog_confirm">Přesto uložit</string>
+    <string name="warning_icon_description">Varování</string>
 
     <!-- Dialog Add Meter -->
     <string name="meter_name_hint">Název měřáku</string>
