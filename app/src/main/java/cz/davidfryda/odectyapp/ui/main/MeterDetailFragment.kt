@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -39,6 +40,10 @@ class MeterDetailFragment : Fragment() {
     private lateinit var historyAdapter: ReadingHistoryAdapter
     private lateinit var targetUserId: String
 
+    // Dočasná paměť pro potvrzení
+    private var lastEnteredValue: Double? = null
+    private var lastPhotoUri: Uri? = null
+
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) takeImage()
@@ -67,14 +72,11 @@ class MeterDetailFragment : Fragment() {
             Firebase.auth.currentUser!!.uid
         }
 
-        // ZMĚNA: Voláme novou inicializační metodu
         viewModel.initializeForUser(targetUserId, args.meterId, requireContext())
-
         setupRecyclerView()
 
         val isLoggedInUser = (targetUserId == Firebase.auth.currentUser!!.uid)
         binding.takeReadingButton.isVisible = isLoggedInUser
-
         val isMasterView = !isLoggedInUser
         historyAdapter.isMasterView = isMasterView
 
@@ -107,7 +109,17 @@ class MeterDetailFragment : Fragment() {
             if (result is UploadResult.Success) {
                 Toast.makeText(requireContext(), "Odečet úspěšně zpracován!", Toast.LENGTH_SHORT).show()
             } else if (result is UploadResult.Error) {
-                Toast.makeText(requireContext(), "Chyba: ${result.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(), "Chyba nahrávání: ${result.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        // NOVÉ: Pozorovatel pro výsledek validace
+        viewModel.validationResult.observe(viewLifecycleOwner) { result ->
+            when (result) {
+                is ValidationResult.WarningHigh -> showWarningDialog(result.message)
+                is ValidationResult.WarningLow -> showWarningDialog(result.message)
+                is ValidationResult.Error -> Toast.makeText(context, "Chyba: ${result.message}", Toast.LENGTH_LONG).show()
+                else -> { /* Validní, nic neděláme, uložení už proběhlo */ }
             }
         }
     }
@@ -121,6 +133,7 @@ class MeterDetailFragment : Fragment() {
     }
 
     private fun showManualInputDialog(photoUri: Uri) {
+        lastPhotoUri = photoUri // Uložíme si URI fotky
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_manual_reading, null)
         val photoPreview = dialogView.findViewById<ImageView>(R.id.dialogPhotoPreview)
         val editText = dialogView.findViewById<EditText>(R.id.dialogValueEditText)
@@ -140,14 +153,40 @@ class MeterDetailFragment : Fragment() {
             val valueDouble = valueString.toDoubleOrNull()
 
             if (valueDouble != null) {
-                // ZMĚNA: Předáváme i context
-                viewModel.saveReading(targetUserId, args.meterId, photoUri, valueDouble, requireContext())
+                lastEnteredValue = valueDouble // Uložíme si zadanou hodnotu
+                // Voláme novou funkci pro validaci
+                viewModel.validateAndSaveReading(targetUserId, args.meterId, photoUri, valueDouble, requireContext())
                 dialog.dismiss()
             } else {
                 Toast.makeText(context, "Prosím, zadejte platnou číselnou hodnotu.", Toast.LENGTH_SHORT).show()
             }
         }
+        cancelButton.setOnClickListener { dialog.dismiss() }
+        dialog.show()
+    }
 
+    // NOVÁ METODA: Zobrazí varovný dialog
+    private fun showWarningDialog(message: String) {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_warning, null)
+        val messageTextView = dialogView.findViewById<TextView>(R.id.warningMessageTextView)
+        val confirmButton = dialogView.findViewById<Button>(R.id.dialogConfirmButton)
+        val cancelButton = dialogView.findViewById<Button>(R.id.dialogCancelButton)
+
+        messageTextView.text = message
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Pozor, možná chyba")
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        confirmButton.setOnClickListener { 
+            // Uživatel potvrdil, že chce hodnotu uložit.
+            if (lastPhotoUri != null && lastEnteredValue != null) {
+                viewModel.forceSaveReading(targetUserId, args.meterId, lastPhotoUri!!, lastEnteredValue!!, requireContext())
+            }
+            dialog.dismiss()
+        }
         cancelButton.setOnClickListener {
             dialog.dismiss()
         }
@@ -176,7 +215,7 @@ class MeterDetailFragment : Fragment() {
             deleteOnExit()
         }
         return FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", tmpFile)
-    }
+    } 
 
     override fun onDestroyView() {
         super.onDestroyView()

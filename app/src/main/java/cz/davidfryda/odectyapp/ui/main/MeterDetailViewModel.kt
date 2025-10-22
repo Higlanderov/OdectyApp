@@ -49,6 +49,9 @@ class MeterDetailViewModel : ViewModel() {
     private val _updateResult = MutableLiveData<UploadResult>()
     val updateResult: LiveData<UploadResult> = _updateResult
 
+    private val _validationResult = MutableLiveData<ValidationResult>()
+    val validationResult: LiveData<ValidationResult> = _validationResult
+
     lateinit var readingHistory: LiveData<List<Reading>>
         private set
 
@@ -77,7 +80,44 @@ class MeterDetailViewModel : ViewModel() {
         }.asLiveData()
     }
 
-    fun saveReading(userId: String, meterId: String, photoUri: Uri, manualValue: Double, context: Context) {
+    fun validateAndSaveReading(userId: String, meterId: String, photoUri: Uri, manualValue: Double, context: Context) {
+        viewModelScope.launch {
+            _uploadResult.value = UploadResult.Loading
+            try {
+                val lastReadingSnapshot = db.collection("readings")
+                    .whereEqualTo("userId", userId)
+                    .whereEqualTo("meterId", meterId)
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .limit(1)
+                    .get()
+                    .await()
+
+                val lastReading = lastReadingSnapshot.documents.firstOrNull()?.toObject(Reading::class.java)
+
+                if (lastReading?.finalValue == null) {
+                    forceSaveReading(userId, meterId, photoUri, manualValue, context)
+                    return@launch
+                }
+
+                val lastValue = lastReading.finalValue
+
+                if (manualValue < lastValue) {
+                    _uploadResult.value = UploadResult.Success
+                    _validationResult.value = ValidationResult.WarningLow("Nová hodnota ($manualValue) je nižší než poslední odečet ($lastValue). Opravdu chcete pokračovat?")
+                } else if (manualValue > lastValue * 2 && lastValue > 0) {
+                    _uploadResult.value = UploadResult.Success
+                    _validationResult.value = ValidationResult.WarningHigh("Nová hodnota ($manualValue) je o více než 100% vyšší než poslední odečet. Jste si jistý/á?")
+                } else {
+                    forceSaveReading(userId, meterId, photoUri, manualValue, context)
+                }
+            } catch (e: Exception) {
+                Log.e("MeterDetailViewModel", "Chyba při validaci.", e)
+                _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při validaci.")
+            }
+        }
+    }
+
+    fun forceSaveReading(userId: String, meterId: String, photoUri: Uri, manualValue: Double, context: Context) {
         if (isOnline(context)) {
             saveReadingOnline(userId, meterId, photoUri, manualValue)
         } else {
@@ -93,13 +133,11 @@ class MeterDetailViewModel : ViewModel() {
                 val photoRef = storage.reference.child("readings/$userId/$photoFileName")
                 photoRef.putFile(photoUri).await()
                 val downloadUrl = photoRef.downloadUrl.await().toString()
-
                 val readingData = hashMapOf(
                     "timestamp" to FieldValue.serverTimestamp(),
                     "photoUrl" to downloadUrl, "status" to "hotovo", "finalValue" to manualValue,
                     "meterId" to meterId, "userId" to userId, "editedByAdmin" to false
                 )
-
                 db.collection("readings").add(readingData).await()
                 _uploadResult.value = UploadResult.Success
             } catch (e: Exception) {
@@ -133,7 +171,7 @@ class MeterDetailViewModel : ViewModel() {
                 _uploadResult.value = UploadResult.Success
             } catch (e: Exception) {
                 Log.e("MeterDetailViewModel", "Chyba při ukládání pro offline použití.", e)
-                _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při ukládání pro offline použití.")
+                _uploadResult.value = UploadResult.Error("Chyba při ukládání pro offline použití.")
             }
         }
     }
