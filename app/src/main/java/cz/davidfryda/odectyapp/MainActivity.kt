@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
     // NOVÉ: Reference na toolbar
     private lateinit var toolbar: Toolbar
 
-    private val TAG = "MainActivity"
+    private val tag = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         updateFcmToken()
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            Log.d(TAG, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
+            Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
             updateUIBasedOnDestination(destination)
         }
     }
@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity() {
         val shouldHideBell = destination.id in hideBellOnDestinations
 
         notificationMenuItem?.isVisible = !shouldHideBell
-        Log.d(TAG, "Viditelnost zvonečku: ${!shouldHideBell}")
+        Log.d(tag, "Viditelnost zvonečku: ${!shouldHideBell}")
 
         updateBadgeVisibility()
 
@@ -120,10 +120,10 @@ class MainActivity : AppCompatActivity() {
                 destination.id == R.id.masterUserListFragment
 
         if (isMainLoggedInDestination && !shouldHideBell) {
-            Log.d(TAG, "Hlavní destinace -> kontroluji roli pro listener.")
+            Log.d(tag, "Hlavní destinace -> kontroluji roli pro listener.")
             checkRoleAndSetupListenerIfNeeded()
         } else {
-            Log.d(TAG, "Jiná destinace -> odpojuji listener.")
+            Log.d(tag, "Jiná destinace -> odpojuji listener.")
             unreadListener?.remove()
             updateBadgeVisibility()
         }
@@ -133,10 +133,10 @@ class MainActivity : AppCompatActivity() {
     private fun updateBadgeVisibility() {
         val shouldShowBadge = (notificationMenuItem?.isVisible == true) && hasUnreadNotifications
 
-        Log.d(TAG, "🎯 updateBadgeVisibility:")
-        Log.d(TAG, "🎯   menuItem?.isVisible = ${notificationMenuItem?.isVisible}")
-        Log.d(TAG, "🎯   hasUnreadNotifications = $hasUnreadNotifications")
-        Log.d(TAG, "🎯   shouldShowBadge = $shouldShowBadge")
+        Log.d(tag, "🎯 updateBadgeVisibility:")
+        Log.d(tag, "🎯   menuItem?.isVisible = ${notificationMenuItem?.isVisible}")
+        Log.d(tag, "🎯   hasUnreadNotifications = $hasUnreadNotifications")
+        Log.d(tag, "🎯   shouldShowBadge = $shouldShowBadge")
 
         notificationBadge?.isVisible = shouldShowBadge
 
@@ -149,21 +149,21 @@ class MainActivity : AppCompatActivity() {
                         BadgeUtils.detachBadgeDrawable(badge, toolbar, R.id.action_notifications)
                         // Pak znovu připojíme
                         BadgeUtils.attachBadgeDrawable(badge, toolbar, R.id.action_notifications)
-                        Log.d(TAG, "✅ Badge znovu připojen")
+                        Log.d(tag, "✅ Badge znovu připojen")
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ Chyba při re-attach badge", e)
+                    Log.e(tag, "❌ Chyba při re-attach badge", e)
                 }
             }
         }
 
-        Log.d(TAG, "🎯   badge?.isVisible = ${notificationBadge?.isVisible}")
+        Log.d(tag, "🎯   badge?.isVisible = ${notificationBadge?.isVisible}")
     }
 
     private fun checkRoleAndSetupListenerIfNeeded() {
         val currentUser = Firebase.auth.currentUser
         if (currentUser == null) {
-            Log.d(TAG, "Uživatel není přihlášen.")
+            Log.d(tag, "Uživatel není přihlášen.")
             unreadListener?.remove()
             hasUnreadNotifications = false
             updateBadgeVisibility()
@@ -171,37 +171,37 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (isUserMaster == true) {
-            Log.d(TAG, "Role master známa, spouštím listener.")
+            Log.d(tag, "Role master známa, spouštím listener.")
             listenForUnreadNotifications(currentUser.uid)
             return
         }
         if (isUserMaster == false) {
-            Log.d(TAG, "Role non-master známa, listener nespouštím.")
+            Log.d(tag, "Role non-master známa, listener nespouštím.")
             unreadListener?.remove()
             hasUnreadNotifications = false
             updateBadgeVisibility()
             return
         }
 
-        Log.d(TAG, "Role není známa, zjišťuji z Firestore.")
+        Log.d(tag, "Role není známa, zjišťuji z Firestore.")
         Firebase.firestore.collection("users").document(currentUser.uid).get()
             .addOnSuccessListener { document ->
                 val isMaster = document.getString("role") == "master"
                 isUserMaster = isMaster
-                Log.d(TAG, "Role získána: isMaster = $isMaster")
+                Log.d(tag, "Role získána: isMaster = $isMaster")
 
                 if (isMaster) {
-                    Log.d(TAG, "Je master, spouštím listener.")
+                    Log.d(tag, "Je master, spouštím listener.")
                     listenForUnreadNotifications(currentUser.uid)
                 } else {
-                    Log.d(TAG, "Není master, odpojuji listener.")
+                    Log.d(tag, "Není master, odpojuji listener.")
                     unreadListener?.remove()
                     hasUnreadNotifications = false
                     updateBadgeVisibility()
                 }
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "Chyba při získávání role.", e)
+                Log.e(tag, "Chyba při získávání role.", e)
                 isUserMaster = false
                 unreadListener?.remove()
                 hasUnreadNotifications = false
@@ -212,11 +212,11 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unreadListener?.remove()
-        Log.d(TAG, "onDestroy: Listener odpojen.")
+        Log.d(tag, "onDestroy: Listener odpojen.")
     }
 
     private fun setupNotificationBadge() {
-        Log.d(TAG, "setupNotificationBadge voláno.")
+        Log.d(tag, "setupNotificationBadge voláno.")
         notificationBadge = BadgeDrawable.create(this).apply {
             isVisible = false
             backgroundColor = getColor(android.R.color.holo_red_dark)
@@ -225,13 +225,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun listenForUnreadNotifications(masterUserId: String) {
-        Log.d(TAG, "📬 Spouštím listener pro master ID: $masterUserId")
+        Log.d(tag, "📬 Spouštím listener pro master ID: $masterUserId")
         unreadListener?.remove()
         unreadListener = db.collection("notifications").document(masterUserId).collection("items")
             .whereEqualTo("read", false)
             .addSnapshotListener { snapshots, error ->
                 if (error != null) {
-                    Log.e(TAG, "❌ Chyba při naslouchání notifikacím:", error)
+                    Log.e(tag, "❌ Chyba při naslouchání notifikacím:", error)
                     hasUnreadNotifications = false
                     updateBadgeVisibility()
                     return@addSnapshotListener
@@ -240,7 +240,7 @@ class MainActivity : AppCompatActivity() {
                 val hasUnread = snapshots != null && !snapshots.isEmpty
                 val count = snapshots?.size() ?: 0
 
-                Log.d(TAG, "📬 Listener triggered: count=$count, hasUnread=$hasUnread")
+                Log.d(tag, "📬 Listener triggered: count=$count, hasUnread=$hasUnread")
 
                 hasUnreadNotifications = hasUnread
                 updateBadgeVisibility()
@@ -256,12 +256,12 @@ class MainActivity : AppCompatActivity() {
         // OPRAVENO: Připojíme badge s post delay
         toolbar.post {
             notificationBadge?.let { badge ->
-                Log.d(TAG, "🔗 Připojuji badge k toolbaru.")
+                Log.d(tag, "🔗 Připojuji badge k toolbaru.")
                 try {
                     BadgeUtils.attachBadgeDrawable(badge, toolbar, R.id.action_notifications)
-                    Log.d(TAG, "✅ Badge úspěšně připojen")
+                    Log.d(tag, "✅ Badge úspěšně připojen")
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ Chyba při připojování badge", e)
+                    Log.e(tag, "❌ Chyba při připojování badge", e)
                 }
             }
         }
@@ -283,14 +283,14 @@ class MainActivity : AppCompatActivity() {
         val currentUser = Firebase.auth.currentUser ?: return
         Firebase.messaging.token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
-                Log.w(TAG, "Načtení FCM tokenu selhalo", task.exception)
+                Log.w(tag, "Načtení FCM tokenu selhalo", task.exception)
                 return@addOnCompleteListener
             }
             val token = task.result
             val userDocRef = Firebase.firestore.collection("users").document(currentUser.uid)
             userDocRef.set(mapOf("fcmToken" to token), SetOptions.merge())
-                .addOnSuccessListener { Log.d(TAG, "FCM Token uložen.") }
-                .addOnFailureListener { e -> Log.w(TAG, "Uložení FCM Tokenu selhalo", e) }
+                .addOnSuccessListener { Log.d(tag, "FCM Token uložen.") }
+                .addOnFailureListener { e -> Log.w(tag, "Uložení FCM Tokenu selhalo", e) }
         }
     }
 
@@ -302,7 +302,7 @@ class MainActivity : AppCompatActivity() {
                     Firebase.auth.signOut()
                     isUserMaster = null
                     hasUnreadNotifications = false
-                    Log.d(TAG, "Odhlášení.")
+                    Log.d(tag, "Odhlášení.")
                     unreadListener?.remove()
                     updateBadgeVisibility()
                     val navOptions = NavOptions.Builder()
@@ -326,18 +326,18 @@ class MainActivity : AppCompatActivity() {
         val homeDestinationId = if (isMaster) R.id.masterUserListFragment else R.id.mainFragment
 
         if (navController.currentDestination?.id == homeDestinationId) {
-            Log.d(TAG, "Již v cílové destinaci ($homeDestinationId).")
+            Log.d(tag, "Již v cílové destinaci ($homeDestinationId).")
             return
         }
 
-        Log.d(TAG, "Naviguji na $homeDestinationId")
+        Log.d(tag, "Naviguji na $homeDestinationId")
         try {
             val navOptions = NavOptions.Builder()
                 .setLaunchSingleTop(true)
                 .build()
             navController.navigate(homeDestinationId, null, navOptions)
         } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "Chyba navigace na $homeDestinationId", e)
+            Log.e(tag, "Chyba navigace na $homeDestinationId", e)
         }
     }
 
