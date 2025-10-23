@@ -59,12 +59,39 @@
         app:layout_constraintBaseline_toBaselineOf="@id/readingDateLabel"/>
 
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/editButton"
+        android:id="@+id/deleteButton"
+        style="@style/Widget.Material3.Button.OutlinedButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Upravit hodnotu"
+        android:layout_marginBottom="8dp"
+        android:text="Smazat odečet"
+        app:icon="@drawable/ic_delete"
+        app:iconTint="?attr/colorError"
+        android:textColor="?attr/colorError"
+        app:strokeColor="?attr/colorError"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/editButton"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="Upravit hodnotu"
+        app:layout_constraintBottom_toTopOf="@id/deleteButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible" />
 </androidx.constraintlayout.widget.ConstraintLayout>

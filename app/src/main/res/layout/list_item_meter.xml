@@ -12,7 +12,6 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
-        <!-- Ikona měřáku -->
         <ImageView
             android:id="@+id/meterIcon"
             android:layout_width="40dp"
@@ -23,7 +22,6 @@
             tools:srcCompat="@drawable/ic_meter_gas"
             android:contentDescription="@string/meter_icon_description"/>
 
-        <!-- Hlavní název / Popis od Mastera -->
         <TextView
             android:id="@+id/meterName"
             android:layout_width="0dp"
@@ -36,7 +34,6 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:text="Plynoměr v kotelně" />
 
-        <!-- Původní název (pouze pro Mastera) -->
         <TextView
             android:id="@+id/originalMeterName"
             android:layout_width="0dp"
@@ -50,8 +47,6 @@
             app:layout_constraintTop_toBottomOf="@id/meterName"
             tools:text="(Původní: Kotelna Plyn)"
             tools:visibility="visible"/>
-
-        <!-- Stav posledního odečtu -->
         <TextView
             android:id="@+id/lastReadingStatus"
             android:layout_width="0dp"
@@ -62,17 +57,15 @@
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
             app:layout_constraintEnd_toStartOf="@+id/meterOptionsMenuButton"
             app:layout_constraintStart_toEndOf="@id/meterIcon"
-            app:layout_constraintTop_toBottomOf="@id/originalMeterName"
-            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/originalMeterName"  app:layout_constraintBottom_toBottomOf="parent"
             tools:text="Klikněte pro detail" />
 
-        <!-- Tlačítko menu (tři tečky) -->
         <ImageButton
             android:id="@+id/meterOptionsMenuButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Možnosti měřáku"
+            android:contentDescription="@string/meter_options"
             android:padding="8dp"
             app:srcCompat="@drawable/ic_more_vert"
             app:tint="?attr/colorOnSurfaceVariant"

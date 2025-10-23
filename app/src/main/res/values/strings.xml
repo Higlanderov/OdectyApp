@@ -1,9 +1,7 @@
 <resources>
     <string name="app_name">Odecty</string>
-    <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
 
-    <!-- TENTO ŘÁDEK JE OPRAVENÝ -->
     <string name="empty_main_view_text">Zatím nemáte přidané žádné měřáky.\nZačněte kliknutím na tlačítko +.</string>
 
     <string name="add_meter">Přidat měřák</string>
@@ -30,8 +28,6 @@
     <string name="warning_icon_description">Varování</string>
     <string name="original_meter_name_format">(%s)</string>
     <string name="original_meter_name_label">Původní název: %s</string>
-
-    <!-- Dialog Add Meter -->
     <string name="meter_name_hint">Název měřáku</string>
     <string name="meter_type_electricity">Elektřina</string>
     <string name="meter_type_gas">Plyn</string>
@@ -44,6 +40,23 @@
     <string name="save_description_success">Popis byl úspěšně uložen.</string>
     <string name="save_description_error">Chyba při ukládání popisu: %s</string>
     <string name="add_description_dialog_title">Popis pro měřák %s</string>
+    <string name="reading_not_found">Odečet nebyl nalezen.</string>
+    <string name="edit_value">Upravit hodnotu</string>
+    <string name="cannot_edit_unsynced_reading">Nelze upravit nesynchronizovaný odečet.</string>
+    <string name="reading_deleted_successfully">Odečet úspěšně smazán.</string>
+    <string name="error_deleting_reading">Chyba při mazání: %s</string>
+    <string name="value_updated_successfully">Hodnota úspěšně aktualizována.</string>
+    <string name="error_updating_value">Chyba při aktualizaci: %s</string>
+    <string name="edit_reading_value">Upravit hodnotu odečtu</string>
+    <string name="save">Uložit</string>
+    <string name="cancel">Zrušit</string>
+    <string name="please_enter_valid_numeric_value">Prosím, zadejte platnou číselnou hodnotu.</string>
+    <string name="editing_locked">Úprava Uzamčena</string>
+    <string name="reading_locked_message">Tento odečet byl již zkontrolován a upraven správcem. Další změny nejsou možné.</string>
+    <string name="i_understand">Rozumím</string>
+    <string name="delete_reading">Smazat odečet</string>
+    <string name="delete_reading_confirmation">Opravdu chcete smazat tento odečet? Tato akce je nevratná.</string>
+    <string name="delete">Smazat</string>
 
     <string-array name="months_array">
         <item>Leden</item>

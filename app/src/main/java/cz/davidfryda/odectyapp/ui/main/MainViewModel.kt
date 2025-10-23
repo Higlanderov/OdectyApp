@@ -32,15 +32,17 @@ class MainViewModel : ViewModel() {
     val isLoading: LiveData<Boolean> = _isLoading
 
     // Přejmenováno pro jasnost (výsledek přidání)
-    private val _addResult = MutableLiveData<SaveResult>()
+    private val _addResult = MutableLiveData<SaveResult>(SaveResult.Idle) // Inicializace na Idle
     val addResult: LiveData<SaveResult> = _addResult
 
     // NOVÉ: LiveData pro výsledek úpravy
-    private val _updateResult = MutableLiveData<SaveResult>()
+    // --- ZAČÁTEK ZMĚNY ---
+    private val _updateResult = MutableLiveData<SaveResult>(SaveResult.Idle) // Inicializace na Idle
+    // --- KONEC ZMĚNY ---
     val updateResult: LiveData<SaveResult> = _updateResult
 
     // NOVÉ: LiveData pro výsledek smazání
-    private val _deleteResult = MutableLiveData<SaveResult>()
+    private val _deleteResult = MutableLiveData<SaveResult>(SaveResult.Idle) // Inicializace na Idle
     val deleteResult: LiveData<SaveResult> = _deleteResult
 
     private val TAG = "MainViewModel" // Tag pro logování
@@ -98,6 +100,12 @@ class MainViewModel : ViewModel() {
         }
     }
 
+    // --- Resetovací funkce pro Add ---
+    fun resetAddResult() {
+        _addResult.value = SaveResult.Idle
+        Log.d(TAG, "resetAddResult: Stav resetován na Idle.")
+    }
+
     // --- NOVÉ METODY ---
 
     // Metoda pro úpravu názvu měřáku
@@ -125,6 +133,14 @@ class MainViewModel : ViewModel() {
             }
         }
     }
+
+    // --- ZAČÁTEK NOVÉ ČÁSTI ---
+    // Resetovací funkce pro Update
+    fun resetUpdateResult() {
+        _updateResult.value = SaveResult.Idle
+        Log.d(TAG, "resetUpdateResult: Stav resetován na Idle.")
+    }
+    // --- KONEC NOVÉ ČÁSTI ---
 
     // Metoda pro smazání měřáku a jeho dat
     fun deleteMeter(meterId: String, context: Context) {
@@ -204,6 +220,12 @@ class MainViewModel : ViewModel() {
                 Log.e(TAG, "deleteMeter: Chyba při mazání měřáku $meterId", e)
             }
         }
+    }
+
+    // --- Resetovací funkce pro Delete ---
+    fun resetDeleteResult() {
+        _deleteResult.value = SaveResult.Idle
+        Log.d(TAG, "resetDeleteResult: Stav resetován na Idle.")
     }
 
     // Pomocná funkce pro kontrolu připojení k internetu

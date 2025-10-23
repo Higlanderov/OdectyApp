@@ -66,10 +66,12 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
         fun bind(meter: Meter) {
             currentMeter = meter // Uložíme si aktuální měřák
 
+            // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
             // Rozlišení master vs. běžný uživatel pro zobrazení názvů
             if (ownerId != null) { // Master režim
                 binding.meterName.text = meter.masterDescription ?: meter.name // Priorita je popis od mastera
-                if (meter.masterDescription != null && meter.masterDescription != meter.name) { // Zobrazíme původní, jen pokud se liší od popisu
+                // Zobrazíme původní název, jen pokud masterDescription existuje A liší se od původního názvu
+                if (meter.masterDescription != null && meter.masterDescription != meter.name) {
                     binding.originalMeterName.text = itemView.context.getString(R.string.original_meter_name_label, meter.name) // Použití string resource
                     binding.originalMeterName.isVisible = true // Zobrazíme původní název
                 } else {
@@ -81,6 +83,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                 binding.originalMeterName.isVisible = false // Skryjeme TextView pro původní název
                 binding.meterOptionsMenuButton.isVisible = true // Uživatel může upravit/smazat
             }
+            // --- KONEC UPRAVENÉ ČÁSTI ---
 
             // Nastavení ikony měřáku
             val iconRes = when (meter.type) {
@@ -96,7 +99,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
 
             // Kliknutí na celou položku pro navigaci do detailu
             itemView.setOnClickListener {
-                 // KLÍČOVÁ LOGIKA NAVIGACE: Rozlišíme, odkud navigujeme
+                // KLÍČOVÁ LOGIKA NAVIGACE: Rozlišíme, odkud navigujeme
                 val navController = itemView.findNavController()
                 val currentDestinationId = navController.currentDestination?.id
 
@@ -104,9 +107,9 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     if (currentDestinationId == R.id.masterUserDetailFragment && ownerId != null) {
                         // Jsme v Master režimu (na obrazovce MasterUserDetailFragment)
                         if (ownerId.isBlank()) {
-                             Log.e("MeterAdapter", "Cannot navigate to detail in master mode, ownerId is blank for meter: ${meter.id}")
-                             Toast.makeText(itemView.context, "Chyba: Chybí ID uživatele.", Toast.LENGTH_SHORT).show()
-                             return@setOnClickListener
+                            Log.e("MeterAdapter", "Cannot navigate to detail in master mode, ownerId is blank for meter: ${meter.id}")
+                            Toast.makeText(itemView.context, "Chyba: Chybí ID uživatele.", Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
                         }
 
                         Log.d("MeterAdapter", "Navigating from MasterUserDetail to MeterDetail (meterId: ${meter.id}, userId: $ownerId)")
@@ -147,6 +150,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
             val popup = PopupMenu(view.context, view)
             if (ownerId != null) { // Master režim
                 Log.d("MeterAdapter", "Showing master menu for meter: ${currentMeter.id}")
+                // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
                 popup.menuInflater.inflate(R.menu.master_meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
@@ -159,6 +163,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                         else -> false
                     }
                 }
+                // --- KONEC UPRAVENÉ ČÁSTI ---
             } else { // Běžný uživatelský režim
                 Log.d("MeterAdapter", "Showing user menu for meter: ${currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)

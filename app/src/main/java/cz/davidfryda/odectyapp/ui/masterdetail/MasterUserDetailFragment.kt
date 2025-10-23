@@ -22,7 +22,7 @@ import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.FragmentMasterUserDetailBinding
 import cz.davidfryda.odectyapp.ui.main.MeterAdapter
 import cz.davidfryda.odectyapp.ui.main.MeterInteractionListener
-import cz.davidfryda.odectyapp.ui.master.MasterUserDetailViewModel
+import cz.davidfryda.odectyapp.ui.master.MasterUserDetailViewModel // Správný ViewModel
 import cz.davidfryda.odectyapp.ui.user.SaveResult // Import SaveResult
 
 /**
@@ -67,6 +67,7 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
             Log.d(tag, "RecyclerView updated. Empty view visible: ${meters.isEmpty()}")
         }
 
+        // --- ZAČÁTEK NOVÉ ČÁSTI ---
         // Sledujeme výsledek uložení popisu
         viewModel.saveDescriptionResult.observe(viewLifecycleOwner) { result ->
             Log.d(tag, "saveDescriptionResult observed: $result")
@@ -102,6 +103,7 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
                 }
             }
         }
+        // --- KONEC NOVÉ ČÁSTI ---
     }
 
     /**
@@ -170,8 +172,10 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
         saveButton.setOnClickListener {
             val description = editText.text.toString().trim() // Trim pro odstranění bílých znaků
             Log.d(tag, "Save button clicked. Description: '$description'")
+            // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
             // Zavoláme ViewModel pro uložení
             viewModel.saveMasterDescription(ownerUserId, meter.id, description)
+            // --- KONEC UPRAVENÉ ČÁSTI ---
             dialog.dismiss() // Zavřeme dialog
         }
 

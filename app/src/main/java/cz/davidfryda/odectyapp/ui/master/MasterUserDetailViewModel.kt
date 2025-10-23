@@ -18,9 +18,11 @@ class MasterUserDetailViewModel : ViewModel() {
     private val _meters = MutableLiveData<List<Meter>>()
     val meters: LiveData<List<Meter>> = _meters
 
-    // NOVÉ: LiveData pro výsledek uložení popisu
-    private val _saveDescriptionResult = MutableLiveData<SaveResult>()
+    // --- ZAČÁTEK NOVÉ ČÁSTI ---
+    // LiveData pro výsledek uložení popisu
+    private val _saveDescriptionResult = MutableLiveData<SaveResult>(SaveResult.Idle) // Výchozí stav Idle
     val saveDescriptionResult: LiveData<SaveResult> = _saveDescriptionResult
+    // --- KONEC NOVÉ ČÁSTI ---
 
     private val TAG = "MasterUserDetailVM" // Tag pro logování
 
@@ -47,19 +49,21 @@ class MasterUserDetailViewModel : ViewModel() {
             }
     }
 
-    // NOVÁ METODA: Uložení popisu přidaného masterem
+    // --- ZAČÁTEK NOVÉ METODY ---
+    // Metoda pro uložení popisu přidaného masterem
     fun saveMasterDescription(userId: String, meterId: String, description: String) {
         viewModelScope.launch {
             _saveDescriptionResult.value = SaveResult.Loading
             try {
                 // Použijeme update pro změnu pouze jednoho pole
-                // Pokud description je prázdný string, uloží se prázdný string (efektivně smazání popisu)
+                // Pokud description je prázdný string, uložíme null (efektivně smazání popisu)
+                val descriptionToSave = description.ifBlank { null }
                 db.collection("users").document(userId)
                     .collection("meters").document(meterId)
-                    .update("masterDescription", description.ifBlank { null }) // Prázdný popis uložíme jako null
+                    .update("masterDescription", descriptionToSave)
                     .await()
                 _saveDescriptionResult.value = SaveResult.Success
-                Log.d(TAG, "saveMasterDescription: Popis pro měřák $meterId uživatele $userId uložen.")
+                Log.d(TAG, "saveMasterDescription: Popis pro měřák $meterId uživatele $userId uložen jako: '$descriptionToSave'.")
 
             } catch (e: Exception) {
                 _saveDescriptionResult.value = SaveResult.Error(e.message ?: "Chyba při ukládání popisu.")
@@ -68,7 +72,10 @@ class MasterUserDetailViewModel : ViewModel() {
         }
     }
 
+    // Metoda pro resetování stavu výsledku (volá se z Fragmentu)
     fun resetSaveDescriptionResult() {
         _saveDescriptionResult.value = SaveResult.Idle
+        Log.d(TAG, "resetSaveDescriptionResult: Stav resetován na Idle.")
     }
+    // --- KONEC NOVÉ METODY ---
 }

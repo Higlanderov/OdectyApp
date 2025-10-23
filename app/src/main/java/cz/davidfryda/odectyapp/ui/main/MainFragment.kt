@@ -64,66 +64,76 @@ class MainFragment : Fragment(), MeterInteractionListener {
         }
 
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            // Zobrazíme hlavní progress bar jen pokud se načítá seznam měřáků
+            // Progress bar pro jednotlivé akce (add, update, delete) se řídí níže
             binding.progressBar.isVisible = isLoading
-            // Deaktivujeme FAB, pokud se načítá
-            binding.fabAddMeter.isEnabled = !isLoading
+            binding.fabAddMeter.isEnabled = !isLoading // FAB tlačítko
         }
 
         // Sledujeme výsledek přidání
         viewModel.addResult.observe(viewLifecycleOwner) { result ->
-            // Zobrazíme/skryjeme progress bar jen pokud jde o Loading stav pro PŘIDÁNÍ
-            if (result is SaveResult.Loading) binding.progressBar.isVisible = true
-            else if (viewModel.isLoading.value != true) binding.progressBar.isVisible = false // Skryjeme, jen pokud celkově nenačítáme
+            // Progress bar pro ADD akci
+            binding.progressBar.isVisible = result is SaveResult.Loading || viewModel.isLoading.value == true
 
-            binding.fabAddMeter.isEnabled = result !is SaveResult.Loading // FAB tlačítko
+            binding.fabAddMeter.isEnabled = result !is SaveResult.Loading && viewModel.isLoading.value != true // FAB tlačítko
 
             when(result) {
                 is SaveResult.Success -> {
                     showSuccessDialog("Měřák úspěšně přidán.")
+                    viewModel.resetAddResult() // Resetujeme stav po zobrazení
                 }
                 is SaveResult.Error -> {
                     Toast.makeText(context, "Chyba při přidávání: ${result.message}", Toast.LENGTH_LONG).show()
+                    viewModel.resetAddResult() // Resetujeme stav po zobrazení
                 }
                 is SaveResult.Loading -> { /* ProgressBar se točí */ }
                 is SaveResult.Idle -> { /* Idle */ }
             }
         }
 
-        // NOVÉ: Sledujeme výsledek úpravy
+        // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
+        // Sledujeme výsledek úpravy
         viewModel.updateResult.observe(viewLifecycleOwner) { result ->
-            // Zde můžeme také ukazovat ProgressBar, pokud chceme vizuální odezvu i při úpravě
-            // binding.progressBar.isVisible = result is SaveResult.Loading // Odkomentovat pro ProgressBar při úpravě
+            // Progress bar pro UPDATE akci
+            binding.progressBar.isVisible = result is SaveResult.Loading || viewModel.isLoading.value == true
+
+            // Tlačítka nebo jiné prvky by zde mohly být deaktivovány podobně jako FAB u addResult
 
             when(result) {
                 is SaveResult.Success -> {
                     showSuccessDialog("Název měřáku úspěšně upraven.")
+                    viewModel.resetUpdateResult() // Resetujeme stav po zobrazení
                 }
                 is SaveResult.Error -> {
                     Toast.makeText(context, "Chyba při úpravě: ${result.message}", Toast.LENGTH_LONG).show()
+                    viewModel.resetUpdateResult() // Resetujeme stav po zobrazení
                 }
                 is SaveResult.Loading -> { /* Loading */ }
                 is SaveResult.Idle -> { /* Idle */ }
             }
         }
 
-        // NOVÉ: Sledujeme výsledek smazání
+        // Sledujeme výsledek smazání
         viewModel.deleteResult.observe(viewLifecycleOwner) { result ->
-            // Zde můžeme také ukazovat ProgressBar
-            // binding.progressBar.isVisible = result is SaveResult.Loading // Odkomentovat pro ProgressBar při mazání
+            // Progress bar pro DELETE akci
+            binding.progressBar.isVisible = result is SaveResult.Loading || viewModel.isLoading.value == true
+
+            // Tlačítka nebo jiné prvky by zde mohly být deaktivovány
 
             when(result) {
                 is SaveResult.Success -> {
                     Toast.makeText(context, "Měřák byl úspěšně smazán.", Toast.LENGTH_SHORT).show()
-                    // Můžeme přidat Success dialog, pokud chceme výraznější potvrzení
-                    // showSuccessDialog("Měřák byl úspěšně smazán.")
+                    viewModel.resetDeleteResult() // Resetujeme stav po zobrazení
                 }
                 is SaveResult.Error -> {
                     Toast.makeText(context, "Chyba při mazání: ${result.message}", Toast.LENGTH_LONG).show()
+                    viewModel.resetDeleteResult() // Resetujeme stav po zobrazení
                 }
                 is SaveResult.Loading -> { /* Loading */ }
                 is SaveResult.Idle -> { /* Idle */ }
             }
         }
+        // --- KONEC UPRAVENÉ ČÁSTI ---
     }
 
     private fun setupRecyclerView() {
