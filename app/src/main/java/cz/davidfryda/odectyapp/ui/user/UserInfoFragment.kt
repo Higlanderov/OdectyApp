@@ -11,13 +11,13 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.databinding.FragmentUserInfoBinding
-import cz.davidfryda.odectyapp.ui.profile.ProfileViewModel
+import cz.davidfryda.odectyapp.ui.profile.ProfileViewModel // Použijeme stejný ViewModel jako Profil
 
 class UserInfoFragment : Fragment() {
     private var _binding: FragmentUserInfoBinding? = null
     private val binding get() = _binding!!
 
-    // ZMĚNA: Použijeme nový, sjednocený ViewModel
+    // Použijeme ProfileViewModel pro sjednocenou logiku ukládání
     private val viewModel: ProfileViewModel by viewModels()
 
     override fun onCreateView(
@@ -37,7 +37,7 @@ class UserInfoFragment : Fragment() {
             val address = binding.addressEditText.text.toString().trim()
 
             if (name.isNotEmpty() && surname.isNotEmpty() && address.isNotEmpty()) {
-                // Voláme novou, sjednocenou funkci
+                // Voláme sjednocenou funkci z ProfileViewModel
                 viewModel.saveOrUpdateUser(name, surname, address)
             } else {
                 Toast.makeText(context, "Prosím, vyplňte všechna pole.", Toast.LENGTH_SHORT).show()
@@ -53,11 +53,18 @@ class UserInfoFragment : Fragment() {
                 is SaveResult.Success -> {
                     // Po úspěšném uložení navigujeme na hlavní obrazovku
                     findNavController().navigate(R.id.action_userInfoFragment_to_mainFragment)
+                    // Resetujeme stav, aby se při případném návratu zpět nezobrazovala znovu navigace
+                    viewModel.resetSaveResult()
                 }
                 is SaveResult.Error -> {
-                    Toast.makeText(context, "Chyba: ${result.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Chyba při ukládání: ${result.message}", Toast.LENGTH_LONG).show()
+                    // Resetujeme stav
+                    viewModel.resetSaveResult()
                 }
                 is SaveResult.Loading -> { /* ProgressBar se točí */ }
+                is SaveResult.Idle -> {
+                    binding.progressBar.isVisible = false // Ujistíme se, že je skrytý
+                }
             }
         }
     }

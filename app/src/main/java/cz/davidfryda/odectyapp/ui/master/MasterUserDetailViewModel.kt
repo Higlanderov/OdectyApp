@@ -1,11 +1,16 @@
 package cz.davidfryda.odectyapp.ui.master
 
+import android.util.Log // Import pro logování
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope // Import pro viewModelScope
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.data.Meter
+import cz.davidfryda.odectyapp.ui.user.SaveResult // Import pro SaveResult
+import kotlinx.coroutines.launch // Import pro launch
+import kotlinx.coroutines.tasks.await // Import pro await
 
 class MasterUserDetailViewModel : ViewModel() {
     private val db = Firebase.firestore
@@ -13,11 +18,57 @@ class MasterUserDetailViewModel : ViewModel() {
     private val _meters = MutableLiveData<List<Meter>>()
     val meters: LiveData<List<Meter>> = _meters
 
+    // NOVÉ: LiveData pro výsledek uložení popisu
+    private val _saveDescriptionResult = MutableLiveData<SaveResult>()
+    val saveDescriptionResult: LiveData<SaveResult> = _saveDescriptionResult
+
+    private val TAG = "MasterUserDetailVM" // Tag pro logování
+
     fun fetchMetersForUser(userId: String) {
+        // Používáme addSnapshotListener pro real-time aktualizace
         db.collection("users").document(userId).collection("meters")
             .addSnapshotListener { snapshots, error ->
-                if (error != null || snapshots == null) return@addSnapshotListener
-                _meters.value = snapshots.map { it.toObject(Meter::class.java).copy(id = it.id) }
+                if (error != null) {
+                    Log.e(TAG, "fetchMetersForUser: Chyba při načítání měřáků pro $userId", error)
+                    // Můžeme nastavit chybový stav nebo prázdný seznam
+                    _meters.value = emptyList()
+                    return@addSnapshotListener
+                }
+                if (snapshots != null) {
+                    // Mapujeme dokumenty na Meter objekty, včetně nového pole masterDescription
+                    _meters.value = snapshots.map { doc ->
+                        doc.toObject(Meter::class.java).copy(id = doc.id)
+                    }.sortedBy { it.name } // Seřadíme podle jména
+                    Log.d(TAG, "fetchMetersForUser: Načteno ${_meters.value?.size ?: 0} měřáků pro $userId.")
+                } else {
+                    _meters.value = emptyList()
+                    Log.d(TAG, "fetchMetersForUser: Snapshot je null pro $userId.")
+                }
             }
+    }
+
+    // NOVÁ METODA: Uložení popisu přidaného masterem
+    fun saveMasterDescription(userId: String, meterId: String, description: String) {
+        viewModelScope.launch {
+            _saveDescriptionResult.value = SaveResult.Loading
+            try {
+                // Použijeme update pro změnu pouze jednoho pole
+                // Pokud description je prázdný string, uloží se prázdný string (efektivně smazání popisu)
+                db.collection("users").document(userId)
+                    .collection("meters").document(meterId)
+                    .update("masterDescription", description.ifBlank { null }) // Prázdný popis uložíme jako null
+                    .await()
+                _saveDescriptionResult.value = SaveResult.Success
+                Log.d(TAG, "saveMasterDescription: Popis pro měřák $meterId uživatele $userId uložen.")
+
+            } catch (e: Exception) {
+                _saveDescriptionResult.value = SaveResult.Error(e.message ?: "Chyba při ukládání popisu.")
+                Log.e(TAG, "saveMasterDescription: Chyba při ukládání popisu pro $meterId", e)
+            }
+        }
+    }
+
+    fun resetSaveDescriptionResult() {
+        _saveDescriptionResult.value = SaveResult.Idle
     }
 }

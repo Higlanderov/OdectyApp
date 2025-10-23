@@ -28,6 +28,8 @@
     <string name="warning_dialog_message_default">Nová hodnota je o více než 100% vyšší než poslední odečet. Jste si jistý/á?</string>
     <string name="warning_dialog_confirm">Přesto uložit</string>
     <string name="warning_icon_description">Varování</string>
+    <string name="original_meter_name_format">(%s)</string>
+    <string name="original_meter_name_label">Původní název: %s</string>
 
     <!-- Dialog Add Meter -->
     <string name="meter_name_hint">Název měřáku</string>
@@ -36,6 +38,12 @@
     <string name="meter_type_water">Voda</string>
     <string name="dialog_cancel">Zrušit</string>
     <string name="dialog_save">Uložit</string>
+    <string name="meter_options">Možnosti měřáku</string>
+    <string name="action_edit">Upravit</string>
+    <string name="action_delete">Smazat</string>
+    <string name="save_description_success">Popis byl úspěšně uložen.</string>
+    <string name="save_description_error">Chyba při ukládání popisu: %s</string>
+    <string name="add_description_dialog_title">Popis pro měřák %s</string>
 
     <string-array name="months_array">
         <item>Leden</item>
