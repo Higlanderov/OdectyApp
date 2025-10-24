@@ -1,5 +1,7 @@
 package cz.davidfryda.odectyapp.ui.main
 
+import android.content.res.ColorStateList // <-- PŘIDANÝ IMPORT
+import android.graphics.Color // <-- PŘIDANÝ IMPORT (pro fallback barvu)
 import android.os.Bundle
 import android.util.Log // Import pro Log
 import android.view.LayoutInflater
@@ -15,6 +17,7 @@ import androidx.navigation.fragment.findNavController // Import pro navigaci
 import androidx.navigation.fragment.navArgs
 import androidx.swiperefreshlayout.widget.CircularProgressDrawable
 import coil.load
+import com.google.android.material.color.MaterialColors // <-- PŘIDANÝ IMPORT
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Reading // Import Reading
@@ -98,14 +101,32 @@ class ReadingDetailFragment : Fragment() {
             // Ovládání tlačítka Smazat
             if (isAdminEdit) {
                 // Pokud upravil admin a nejsme master, zablokujeme a vizuálně odlišíme
-                binding.deleteButton.text = getString(R.string.edited_by_admin) // Můžeme použít stejný text nebo jiný
-                binding.deleteButton.setIconResource(R.drawable.ic_admin) // Můžeme přidat ikonu zámku nebo admina
+                binding.deleteButton.text = getString(R.string.edited_by_admin)
+                binding.deleteButton.setIconResource(R.drawable.ic_admin)
                 binding.deleteButton.isEnabled = false // Běžný uživatel nemůže smazat
+
+                // <-- START ZMĚNY: Nastavení šedé barvy pro deaktivované tlačítko smazat -->
+                val disabledColor = MaterialColors.getColor(binding.deleteButton, com.google.android.material.R.attr.colorOnSurface, Color.GRAY)
+                val disabledColorStateList = ColorStateList.valueOf(disabledColor).withAlpha(100) // Přidáme trochu průhlednosti
+                binding.deleteButton.strokeColor = disabledColorStateList
+                binding.deleteButton.iconTint = disabledColorStateList
+                binding.deleteButton.setTextColor(disabledColorStateList) // Změníme i barvu textu
+                // <-- KONEC ZMĚNY -->
+
             } else {
-                // Jinak nastavíme standardní text a ikonu (pokud má mít ikonu)
-                binding.deleteButton.text = getString(R.string.delete_reading) // Standardní text
-                binding.deleteButton.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_delete) // Standardní ikona (pokud používáme ikonu)
-                // Tlačítko Smazat je aktivní, pokud není loading (master může vždy, uživatel jen pokud neupravil admin)
+                // Jinak nastavíme standardní text, ikonu a barvy
+                binding.deleteButton.text = getString(R.string.delete_reading)
+                binding.deleteButton.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_delete)
+
+                // <-- START ZMĚNY: Vrácení původní (červené) barvy -->
+                val errorColor = MaterialColors.getColor(binding.deleteButton, com.google.android.material.R.attr.colorError)
+                val errorColorStateList = ColorStateList.valueOf(errorColor)
+                binding.deleteButton.strokeColor = errorColorStateList
+                binding.deleteButton.iconTint = errorColorStateList
+                binding.deleteButton.setTextColor(errorColorStateList) // Vrátíme barvu textu
+                // <-- KONEC ZMĚNY -->
+
+                // Tlačítko Smazat je aktivní, pokud není loading
                 binding.deleteButton.isEnabled = !isLoading
             }
             // --- KONEC ŘÍZENÍ AKTIVITY A VZHLEDU TLAČÍTEK ---
@@ -136,14 +157,41 @@ class ReadingDetailFragment : Fragment() {
         viewModel.deleteResult.observe(viewLifecycleOwner) { result ->
             val isLoading = result is UploadResult.Loading || viewModel.updateResult.value is UploadResult.Loading
             binding.progressBar.isVisible = isLoading
-            // Znovu aplikujeme logiku pro isEnabled na základě aktuálního reading a nového isLoading
+
             currentReading?.let { reading ->
                 val isAdminEdit = reading.editedByAdmin && !args.isMasterView
                 binding.editButton.isEnabled = !isLoading && reading.isSynced && !isAdminEdit
-                binding.deleteButton.isEnabled = !isLoading && (!isAdminEdit || args.isMasterView)
+
+                // <-- START ZMĚNY: Aplikace logiky barev i zde -->
+                if (isAdminEdit) {
+                    binding.deleteButton.isEnabled = false // Deaktivace
+                    val disabledColor = MaterialColors.getColor(binding.deleteButton, com.google.android.material.R.attr.colorOnSurface, Color.GRAY)
+                    val disabledColorStateList = ColorStateList.valueOf(disabledColor).withAlpha(100)
+                    binding.deleteButton.strokeColor = disabledColorStateList
+                    binding.deleteButton.iconTint = disabledColorStateList
+                    binding.deleteButton.setTextColor(disabledColorStateList)
+                } else {
+                    binding.deleteButton.isEnabled = !isLoading // Aktivace/deaktivace podle isLoading
+                    val colorAttr = if (binding.deleteButton.isEnabled) com.google.android.material.R.attr.colorError else com.google.android.material.R.attr.colorOnSurface
+                    val color = MaterialColors.getColor(binding.deleteButton, colorAttr, Color.GRAY) // Přidán fallback Color.GRAY
+                    val colorStateList = ColorStateList.valueOf(color)
+                    val finalColorStateList = if (binding.deleteButton.isEnabled) colorStateList else colorStateList.withAlpha(100)
+                    binding.deleteButton.strokeColor = finalColorStateList
+                    binding.deleteButton.iconTint = finalColorStateList
+                    binding.deleteButton.setTextColor(finalColorStateList)
+                }
+                // <-- KONEC ZMĚNY -->
+
             } ?: run { // Pokud currentReading je null (např. po smazání), deaktivujeme
                 binding.editButton.isEnabled = false
                 binding.deleteButton.isEnabled = false
+                // <-- START ZMĚNY: Nastavení šedé i zde pro jistotu -->
+                val disabledColor = MaterialColors.getColor(binding.deleteButton, com.google.android.material.R.attr.colorOnSurface, Color.GRAY)
+                val disabledColorStateList = ColorStateList.valueOf(disabledColor).withAlpha(100)
+                binding.deleteButton.strokeColor = disabledColorStateList
+                binding.deleteButton.iconTint = disabledColorStateList
+                binding.deleteButton.setTextColor(disabledColorStateList)
+                // <-- KONEC ZMĚNY -->
             }
 
 
@@ -171,16 +219,42 @@ class ReadingDetailFragment : Fragment() {
         viewModel.updateResult.observe(viewLifecycleOwner) { result ->
             val isLoading = result is UploadResult.Loading || viewModel.deleteResult.value is UploadResult.Loading
             binding.progressBar.isVisible = isLoading
-            // Znovu aplikujeme logiku pro isEnabled na základě aktuálního reading a nového isLoading
+
             currentReading?.let { reading ->
                 val isAdminEdit = reading.editedByAdmin && !args.isMasterView
                 binding.editButton.isEnabled = !isLoading && reading.isSynced && !isAdminEdit
-                binding.deleteButton.isEnabled = !isLoading && (!isAdminEdit || args.isMasterView)
+
+                // <-- START ZMĚNY: Aplikace logiky barev i zde (stejná jako v deleteResult) -->
+                if (isAdminEdit) {
+                    binding.deleteButton.isEnabled = false // Deaktivace
+                    val disabledColor = MaterialColors.getColor(binding.deleteButton, com.google.android.material.R.attr.colorOnSurface, Color.GRAY)
+                    val disabledColorStateList = ColorStateList.valueOf(disabledColor).withAlpha(100)
+                    binding.deleteButton.strokeColor = disabledColorStateList
+                    binding.deleteButton.iconTint = disabledColorStateList
+                    binding.deleteButton.setTextColor(disabledColorStateList)
+                } else {
+                    binding.deleteButton.isEnabled = !isLoading // Aktivace/deaktivace podle isLoading
+                    val colorAttr = if (binding.deleteButton.isEnabled) com.google.android.material.R.attr.colorError else com.google.android.material.R.attr.colorOnSurface
+                    val color = MaterialColors.getColor(binding.deleteButton, colorAttr, Color.GRAY) // Přidán fallback Color.GRAY
+                    val colorStateList = ColorStateList.valueOf(color)
+                    val finalColorStateList = if (binding.deleteButton.isEnabled) colorStateList else colorStateList.withAlpha(100)
+                    binding.deleteButton.strokeColor = finalColorStateList
+                    binding.deleteButton.iconTint = finalColorStateList
+                    binding.deleteButton.setTextColor(finalColorStateList)
+                }
+                // <-- KONEC ZMĚNY -->
+
             } ?: run { // Pokud currentReading je null
                 binding.editButton.isEnabled = false
                 binding.deleteButton.isEnabled = false
+                // <-- START ZMĚNY: Nastavení šedé i zde -->
+                val disabledColor = MaterialColors.getColor(binding.deleteButton, com.google.android.material.R.attr.colorOnSurface, Color.GRAY)
+                val disabledColorStateList = ColorStateList.valueOf(disabledColor).withAlpha(100)
+                binding.deleteButton.strokeColor = disabledColorStateList
+                binding.deleteButton.iconTint = disabledColorStateList
+                binding.deleteButton.setTextColor(disabledColorStateList)
+                // <-- KONEC ZMĚNY -->
             }
-
             when(result) {
                 is UploadResult.Success -> {
                     Log.d(tag, "updateResult observer: Success.")
