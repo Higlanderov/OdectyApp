@@ -7,14 +7,25 @@
     android:padding="16dp"
     tools:context=".ui.profile.ProfileFragment">
 
+    <TextView
+        android:id="@+id/profileTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/profile_title"
+        android:textAppearance="@style/TextAppearance.MaterialComponents.Headline5"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/nameLayout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:hint="Jméno"
+        android:layout_marginTop="16dp"
+        android:hint="@string/user_info_name_hint"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/profileTitle">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/nameEditText"
@@ -28,7 +39,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="Příjmení"
+        android:hint="@string/user_info_surname_hint"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/nameLayout">
@@ -45,7 +56,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="Adresa"
+        android:hint="@string/user_info_address_hint"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/surnameLayout">
@@ -57,15 +68,31 @@
             android:inputType="textPostalAddress" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/phoneLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/user_info_phone_hint"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/addressLayout">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/phoneEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="phone" />
+    </com.google.android.material.textfield.TextInputLayout>
     <com.google.android.material.button.MaterialButton
         android:id="@+id/saveButton"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="24dp"
-        android:text="Uložit změny"
+        android:text="@string/profile_save_changes"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/addressLayout" />
+        app:layout_constraintTop_toBottomOf="@id/phoneLayout" />
 
     <ProgressBar
         android:id="@+id/progressBar"

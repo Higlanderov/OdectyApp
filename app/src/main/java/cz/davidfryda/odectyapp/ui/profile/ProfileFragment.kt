@@ -3,6 +3,7 @@ package cz.davidfryda.odectyapp.ui.profile
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log // <-- Ověřte import Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -24,6 +25,7 @@ class ProfileFragment : Fragment() {
     private val viewModel: ProfileViewModel by viewModels()
 
     private var successDialog: AlertDialog? = null // Reference pro success dialog
+    private val handler = Handler(Looper.getMainLooper()) // Handler pro dialog
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentProfileBinding.inflate(inflater, container, false)
@@ -35,11 +37,16 @@ class ProfileFragment : Fragment() {
         viewModel.loadUserData() // Načteme data při vytvoření view
 
         viewModel.userData.observe(viewLifecycleOwner) { user: UserData? ->
-            // Kontrola na null pro případ chyby načítání
             user?.let {
                 binding.nameEditText.setText(it.name)
                 binding.surnameEditText.setText(it.surname)
                 binding.addressEditText.setText(it.address)
+                binding.phoneEditText.setText(it.phoneNumber)
+            } ?: run {
+                binding.nameEditText.setText("")
+                binding.surnameEditText.setText("")
+                binding.addressEditText.setText("")
+                binding.phoneEditText.setText("")
             }
         }
 
@@ -51,17 +58,21 @@ class ProfileFragment : Fragment() {
                 is SaveResult.Success -> {
                     binding.progressBar.isVisible = false
                     showSuccessDialog("Změny úspěšně uloženy.")
-                    viewModel.resetSaveResult() // Resetujeme stav
+                    // --- START ZMĚNY ---
+                    // Reset stavu přesuneme DOVNITŘ showSuccessDialog (po 1500ms)
+                    // viewModel.resetSaveResult() // <-- NEVOLAT ZDE
+                    // --- KONEC ZMĚNY ---
                 }
                 is SaveResult.Error -> {
                     binding.progressBar.isVisible = false
                     Toast.makeText(context, "Chyba při ukládání: ${result.message}", Toast.LENGTH_LONG).show()
-                    viewModel.resetSaveResult() // Resetujeme stav
+                    viewModel.resetSaveResult() // Zde je reset v pořádku
                 }
                 is SaveResult.Loading -> { /* ProgressBar je viditelný */ }
                 is SaveResult.Idle -> {
                     binding.progressBar.isVisible = false
-                    successDialog?.dismiss() // Zavřeme dialog, pokud je otevřený
+                    // Toto zavolá observer, když se stav resetuje, a uklidí dialog, pokud by zbyl
+                    dismissSuccessDialog()
                 }
             }
         }
@@ -70,9 +81,10 @@ class ProfileFragment : Fragment() {
             val name = binding.nameEditText.text.toString().trim()
             val surname = binding.surnameEditText.text.toString().trim()
             val address = binding.addressEditText.text.toString().trim()
+            val phone = binding.phoneEditText.text.toString().trim()
 
-            if (name.isNotEmpty() && surname.isNotEmpty() && address.isNotEmpty()) {
-                viewModel.saveOrUpdateUser(name, surname, address)
+            if (name.isNotEmpty() && surname.isNotEmpty() && address.isNotEmpty() && phone.isNotEmpty()) {
+                viewModel.saveOrUpdateUser(name, surname, address, phone)
             } else {
                 Toast.makeText(context, "Prosím, vyplňte všechna pole.", Toast.LENGTH_SHORT).show()
             }
@@ -81,27 +93,64 @@ class ProfileFragment : Fragment() {
 
     // Zobrazí dialog o úspěchu
     private fun showSuccessDialog(message: String) {
-        successDialog?.dismiss() // Zavřeme předchozí
-        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_success, null)
-        val messageTextView = dialogView.findViewById<TextView>(R.id.successMessageTextView)
-        messageTextView.text = message
-        successDialog = MaterialAlertDialogBuilder(requireContext())
-            .setView(dialogView)
-            .setCancelable(false)
-            .create()
-        successDialog?.show()
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (successDialog?.isShowing == true) {
+        dismissSuccessDialog() // Zavřeme předchozí, pokud existuje
+
+        context?.let { ctx ->
+            val dialogView = LayoutInflater.from(ctx).inflate(R.layout.dialog_success, null)
+            val messageTextView = dialogView.findViewById<TextView>(R.id.successMessageTextView)
+            messageTextView.text = message
+            successDialog = MaterialAlertDialogBuilder(ctx)
+                .setView(dialogView)
+                .setCancelable(false)
+                .create()
+
+            try {
+                successDialog?.show()
+                // Zrušíme případné předchozí čekání
+                handler.removeCallbacksAndMessages(null)
+                // Automatické zavření po 1.5 sekundě
+                handler.postDelayed({
+                    dismissSuccessDialog() // Zavřeme dialog
+                    // --- START ZMĚNY ---
+                    viewModel.resetSaveResult() // <-- RESET STAVU AŽ PO ZAVŘENÍ DIALOGU
+                    // --- KONEC ZMĚNY ---
+                }, 1500) // 1.5 sekundy
+            } catch (e: Exception) {
+                Log.e("ProfileFragment", "Error showing success dialog: ${e.message}")
+                successDialog = null
+                viewModel.resetSaveResult() // Resetujeme stav i v případě chyby zobrazení dialogu
+            }
+        } ?: run {
+            Log.e("ProfileFragment", "showSuccessDialog: Context is null!")
+            viewModel.resetSaveResult() // Resetujeme stav, pokud je kontext null
+        }
+    }
+
+    // Bezpečně zavře dialog úspěchu
+    private fun dismissSuccessDialog() {
+        if (successDialog?.isShowing == true && isAdded) {
+            try {
                 successDialog?.dismiss()
+            } catch (e: Exception) {
+                Log.w("ProfileFragment", "Error dismissing success dialog (might be expected during rapid navigation): ${e.message}")
+            } finally {
                 successDialog = null
             }
-        }, 1500)
+        } else if (successDialog != null) {
+            successDialog = null
+        }
+
+        // Zrušíme případné čekání na handleru pro jistotu
+        handler.removeCallbacksAndMessages(null)
     }
+
 
     override fun onDestroyView() {
         super.onDestroyView()
-        successDialog?.dismiss() // Zavřeme dialog při zničení view
-        successDialog = null
+        // Zrušíme čekání na zavření dialogu
+        handler.removeCallbacksAndMessages(null)
+        // Zavřeme dialog při zničení view
+        dismissSuccessDialog()
         _binding = null
     }
 }

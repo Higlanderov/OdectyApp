@@ -57,6 +57,24 @@
     <string name="delete_reading">Smazat odečet</string>
     <string name="delete_reading_confirmation">Opravdu chcete smazat tento odečet? Tato akce je nevratná.</string>
     <string name="delete">Smazat</string>
+    <string name="user_detail_title">Detaily uživatele</string>
+    <string name="not_available">N/A</string>
+    <string name="no_reading_yet">Zatím žádný odečet</string>
+    <string name="user_info_title">Doplňte své údaje</string>
+    <string name="user_info_name_hint">Jméno</string>
+    <string name="user_info_surname_hint">Příjmení</string>
+    <string name="user_info_address_hint">Adresa</string>
+    <string name="user_info_phone_hint">Telefonní číslo</string>
+    <string name="user_info_save_button">Uložit a pokračovat</string>
+    <string name="profile_title">Váš Profil</string>
+    <string name="profile_save_changes">Uložit změny</string>
+    <string name="user_detail_name_label">Jméno:</string>
+    <string name="user_detail_address_label">Adresa:</string>
+    <string name="user_detail_phone_label">Telefon:</string>
+    <string name="user_detail_user_id_label">User ID:</string>
+    <string name="user_detail_meter_count_label">Počet měřáků:</string>
+    <string name="user_detail_last_reading_label">Poslední odečet:</string>
+    <string name="user_detail_email_label">Email:</string>
 
     <string-array name="months_array">
         <item>Leden</item>

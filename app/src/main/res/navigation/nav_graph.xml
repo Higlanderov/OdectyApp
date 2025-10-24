@@ -160,6 +160,9 @@
         <action
             android:id="@+id/action_masterUserListFragment_to_masterUserDetailFragment"
             app:destination="@id/masterUserDetailFragment" />
+        <action
+            android:id="@+id/action_masterUserListFragment_to_userDetailFragment"
+            app:destination="@id/userDetailFragment" />
     </fragment>
     <fragment
         android:id="@+id/masterUserDetailFragment"
@@ -178,12 +181,16 @@
         android:name="cz.davidfryda.odectyapp.ui.notifications.NotificationListFragment"
         android:label="fragment_notification_list"
         tools:layout="@layout/fragment_notification_list" >
-        <!-- Není potřeba specifická akce zde, pokud použijeme globální akci -->
-        <!--
-        <action
-            android:id="@+id/action_notificationListFragment_to_readingDetailFragment"
-            app:destination="@id/readingDetailFragment" />
-         -->
-    </dialog><action android:id="@+id/action_global_readingDetailFragment" app:destination="@id/readingDetailFragment"/>
-</navigation>
+    </dialog>
 
+    <fragment
+        android:id="@+id/userDetailFragment"
+        android:name="cz.davidfryda.odectyapp.ui.master.UserDetailFragment"
+        android:label="Detail uživatele"
+        tools:layout="@layout/fragment_user_detail">
+        <argument
+            android:name="userId"
+            app:argType="string" />
+    </fragment>
+    <action android:id="@+id/action_global_readingDetailFragment" app:destination="@id/readingDetailFragment"/>
+</navigation>

@@ -2,6 +2,7 @@ package cz.davidfryda.odectyapp.ui.master
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.ImageButton // <-- Přidán import
 import androidx.core.content.ContextCompat
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
@@ -23,6 +24,10 @@ class UserListAdapter : ListAdapter<UserWithStatus, UserListAdapter.UserViewHold
     }
 
     class UserViewHolder(private val binding: ListItemUserBinding) : RecyclerView.ViewHolder(binding.root) {
+
+        // <-- Přidána reference na tlačítko -->
+        private val infoButton: ImageButton = binding.infoButton
+
         fun bind(userWithStatus: UserWithStatus) {
             val user = userWithStatus.user
             binding.userName.text = "${user.name} ${user.surname}"
@@ -36,15 +41,24 @@ class UserListAdapter : ListAdapter<UserWithStatus, UserListAdapter.UserViewHold
             }
             (itemView as com.google.android.material.card.MaterialCardView).setCardBackgroundColor(backgroundColor)
 
-
+            // Kliknutí na CELOU KARTU stále vede do seznamu měřáků
             itemView.setOnClickListener {
                 val action = MasterUserListFragmentDirections.actionMasterUserListFragmentToMasterUserDetailFragment(user.uid)
                 itemView.findNavController().navigate(action)
             }
+
+            // <-- START ZMĚNY: Listener pro Info tlačítko -->
+            infoButton.setOnClickListener {
+                // Navigace na nový UserDetailFragment
+                val action = MasterUserListFragmentDirections.actionMasterUserListFragmentToUserDetailFragment(user.uid)
+                itemView.findNavController().navigate(action)
+            }
+            // <-- KONEC ZMĚNY -->
         }
     }
 }
 
+// DiffUtil zůstává stejný
 class UserWithStatusDiffCallback : DiffUtil.ItemCallback<UserWithStatus>() {
     override fun areItemsTheSame(oldItem: UserWithStatus, newItem: UserWithStatus): Boolean {
         return oldItem.user.uid == newItem.user.uid
