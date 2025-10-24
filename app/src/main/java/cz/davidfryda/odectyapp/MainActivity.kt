@@ -1,5 +1,6 @@
 package cz.davidfryda.odectyapp
 
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -8,12 +9,16 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast // <-- PŘIDÁN IMPORT
+import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.content.edit
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.lifecycleScope // Ověř import
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -21,13 +26,14 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
-import androidx.navigation.ui.onNavDestinationSelected // Ověř, že tento import funguje
+import androidx.navigation.ui.onNavDestinationSelected
 import androidx.navigation.ui.setupActionBarWithNavController
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.badge.BadgeUtils
 import com.google.android.material.badge.ExperimentalBadgeUtils
+import com.google.android.material.dialog.MaterialAlertDialogBuilder // <-- PŘIDÁN IMPORT
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ListenerRegistration
@@ -36,14 +42,20 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.messaging.ktx.messaging
 import cz.davidfryda.odectyapp.data.UserData
-// Importy pro WorkManager - ověř, zda jsou správné
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import cz.davidfryda.odectyapp.workers.NotificationWorker // <-- Ověř cestu k Workeru
-import java.util.concurrent.TimeUnit // <-- Import pro TimeUnit
+import cz.davidfryda.odectyapp.workers.NotificationWorker
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.IOException // <-- PŘIDANÝ IMPORT
+import java.util.concurrent.TimeUnit
 
-@ExperimentalBadgeUtils // Potřebné pro BadgeUtils
+@ExperimentalBadgeUtils
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
@@ -59,6 +71,34 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
 
     private val tag = "MainActivity"
+
+    // ActivityResultLauncher pro výběr obrázku
+    private val pickMediaLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            Log.d(tag, "Vybráno URI obrázku: $uri")
+            val user = Firebase.auth.currentUser
+            if (user != null) {
+                // Kopírování obrázku v Coroutine mimo hlavní vlákno
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val internalPath = copyImageToInternalStorage(user.uid, uri)
+                    if (internalPath != null) {
+                        saveProfileImagePath(user.uid, internalPath)
+                        // Aktualizaci UI musíme provést zpět na hlavním vlákně
+                        withContext(Dispatchers.Main) {
+                            updateNavHeader(findViewById(R.id.nav_view))
+                        }
+                    } else {
+                        // Ošetření chyby kopírování (na hlavním vlákně)
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(this@MainActivity, "Chyba při ukládání obrázku.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+        } else {
+            Log.d(tag, "Výběr obrázku zrušen.")
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,8 +149,39 @@ class MainActivity : AppCompatActivity() {
             updateToolbarMenuVisibility(destination)
         }
 
-        // Plánování Workeru pro kontrolu notifikací - přesunuto sem z konce
         scheduleNotificationWorker()
+    }
+
+    // Funkce pro kopírování obrázku
+    private fun copyImageToInternalStorage(userId: String, sourceUri: Uri): String? {
+        val fileName = "profile_image_$userId.jpg"
+        val destinationFile = File(filesDir, fileName)
+
+        var inputStream: InputStream? = null
+        var outputStream: FileOutputStream? = null
+        try {
+            inputStream = contentResolver.openInputStream(sourceUri)
+            outputStream = FileOutputStream(destinationFile)
+            if (inputStream != null) {
+                inputStream.copyTo(outputStream)
+                Log.d(tag, "Obrázek zkopírován do: ${destinationFile.absolutePath}")
+                return destinationFile.absolutePath
+            } else {
+                Log.e(tag, "Nepodařilo se otevřít InputStream pro URI: $sourceUri")
+                return null
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Chyba při kopírování obrázku do interního úložiště.", e)
+            destinationFile.delete()
+            return null
+        } finally {
+            try {
+                inputStream?.close()
+                outputStream?.close()
+            } catch (ioe: IOException) { // Nyní by měla být IOException rozpoznána
+                Log.e(tag, "Chyba při zavírání streamů.", ioe)
+            }
+        }
     }
 
     private fun updateToolbarMenuVisibility(destination: NavDestination) {
@@ -171,7 +242,6 @@ class MainActivity : AppCompatActivity() {
         Log.d(tag, "Spouštím listener pro notifikace mastera ID: $masterUserId")
         if (unreadListener != null) {
             Log.d(tag, "Listener notifikací již běží.")
-            // return // Můžeme nechat běžet, Firestore by měl zvládnout duplicitní listenery
         }
         unreadListener?.remove()
 
@@ -228,8 +298,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 true
             }
-            // Zpracování kliknutí na home/up tlačítko (šipka zpět nebo hamburger ikona)
-            // se nyní děje v onSupportNavigateUp(), není potřeba zde řešit android.R.id.home
             else -> item.onNavDestinationSelected(navController) || super.onOptionsItemSelected(item)
         }
     }
@@ -254,9 +322,7 @@ class MainActivity : AppCompatActivity() {
             drawerLayout.closeDrawers()
 
             when (menuItem.itemId) {
-                // --- START ZMĚNY: Použito správné ID pro logout ---
                 R.id.logout_action -> {
-                    // --- KONEC ZMĚNY ---
                     Firebase.auth.signOut()
                     hasUnreadNotifications = false
                     unreadListener?.remove()
@@ -283,23 +349,7 @@ class MainActivity : AppCompatActivity() {
                     navigateHome()
                     return@setNavigationItemSelectedListener true
                 }
-                // --- START ZMĚNY: ID pro notifikace z drawer menu ---
-                // Ověř, že R.id.notifications existuje v drawer_menu.xml, pokud tam má být
-                // Pokud tam není, tuto část odstraň. Pokud ano, odkomentuj:
-                /*
-                R.id.notifications -> {
-                    try {
-                        navController.navigate(R.id.notificationListFragment)
-                    } catch (e: Exception) {
-                        Log.e(tag, "Chyba navigace na NotificationListFragment z draweru", e)
-                        Toast.makeText(this, "Nelze zobrazit notifikace.", Toast.LENGTH_SHORT).show()
-                    }
-                    return@setNavigationItemSelectedListener true
-                }
-                 */
-                // --- KONEC ZMĚNY ---
                 else -> {
-                    // Výchozí chování - necháme NavController navigovat
                     return@setNavigationItemSelectedListener menuItem.onNavDestinationSelected(navController)
                 }
             }
@@ -345,6 +395,7 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
+    // Aktualizace hlavičky draweru
     private fun updateNavHeader(navView: NavigationView) {
         val headerView = navView.getHeaderView(0)
         val userNameTextView = headerView.findViewById<TextView>(R.id.userNameTextView)
@@ -354,62 +405,173 @@ class MainActivity : AppCompatActivity() {
         val user = Firebase.auth.currentUser
 
         if (user != null) {
+            val userId = user.uid
             userEmailTextView.text = user.email ?: "N/A"
 
-            db.collection("users").document(user.uid).get()
+            // Načtení jména z Firestore
+            db.collection("users").document(userId).get()
                 .addOnSuccessListener { document ->
                     val userData = document.toObject(UserData::class.java)
                     userNameTextView.text = if (userData != null && userData.name.isNotEmpty()) {
                         "${userData.name} ${userData.surname}"
                     } else {
-                        // --- START ZMĚNY: Použití string resource ---
                         user.displayName ?: getString(R.string.default_username)
-                        // --- KONEC ZMĚNY ---
                     }
                     if (document.getString("role") == "master") {
-                        listenForUnreadNotifications(user.uid)
+                        listenForUnreadNotifications(userId)
                     } else {
-                        unreadListener?.remove()
-                        unreadListener = null
-                        hasUnreadNotifications = false
-                        notificationBadge?.number = 0
-                        updateBadgeVisibility()
+                        unreadListener?.remove(); unreadListener = null; hasUnreadNotifications = false; notificationBadge?.number = 0; updateBadgeVisibility()
                     }
                 }
                 .addOnFailureListener { e ->
                     Log.w(tag, "Chyba při načítání UserData pro hlavičku", e)
-                    // --- START ZMĚNY: Použití string resource ---
                     userNameTextView.text = user.displayName ?: getString(R.string.default_username)
-                    // --- KONEC ZMĚNY ---
-                    unreadListener?.remove()
-                    unreadListener = null
-                    hasUnreadNotifications = false
-                    notificationBadge?.number = 0
-                    updateBadgeVisibility()
+                    unreadListener?.remove(); unreadListener = null; hasUnreadNotifications = false; notificationBadge?.number = 0; updateBadgeVisibility()
                 }
 
-            user.photoUrl?.let { photoUrl ->
-                profileImageView.load(photoUrl) {
-                    crossfade(true)
-                    placeholder(R.drawable.ic_profile)
-                    error(R.drawable.ic_profile)
-                    transformations(CircleCropTransformation())
+            // Načtení obrázku (lokální > Google > default)
+            val localImagePath = getProfileImagePath(userId)
+            var isLocalImageLoaded = false // Příznak, zda jsme načetli lokální obrázek
+            if (localImagePath != null) {
+                val imageFile = File(localImagePath)
+                if (imageFile.exists()) {
+                    Log.d(tag, "Načítám lokální profilový obrázek pro $userId z: $localImagePath")
+                    isLocalImageLoaded = true // Označíme, že lokální obrázek existuje
+                    profileImageView.load(imageFile) {
+                        crossfade(true)
+                        placeholder(R.drawable.ic_profile)
+                        error(R.drawable.ic_profile)
+                        transformations(CircleCropTransformation())
+                    }
+                } else {
+                    Log.w(tag, "Lokální soubor obrázku nenalezen: $localImagePath. Mažu preferenci.")
+                    clearProfileImagePath(userId)
+                    loadGoogleOrDefaultImage(profileImageView, user)
                 }
-            } ?: run {
-                profileImageView.setImageResource(R.drawable.ic_profile)
+            } else {
+                loadGoogleOrDefaultImage(profileImageView, user)
+            }
+
+            // Nastavení OnClickListeneru podle toho, zda je lokální obrázek
+            if (isLocalImageLoaded) {
+                profileImageView.setOnClickListener {
+                    showImageOptionsDialog(userId) // Voláme nový dialog
+                }
+            } else {
+                profileImageView.setOnClickListener {
+                    Log.d(tag, "Kliknuto na profilový obrázek (Google/default), spouštím výběr média.")
+                    pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
             }
 
         } else {
-            // --- START ZMĚNY: Použití string resource ---
+            // Uživatel není přihlášen
             userNameTextView.text = getString(R.string.not_logged_in)
-            // --- KONEC ZMĚNY ---
             userEmailTextView.text = ""
             profileImageView.setImageResource(R.drawable.ic_profile)
-            unreadListener?.remove()
-            unreadListener = null
-            hasUnreadNotifications = false
-            notificationBadge?.number = 0
-            updateBadgeVisibility()
+            profileImageView.setOnClickListener(null) // Odebrání listeneru
+            unreadListener?.remove(); unreadListener = null; hasUnreadNotifications = false; notificationBadge?.number = 0; updateBadgeVisibility()
+        }
+    }
+
+    // Pomocná funkce pro Google/default obrázek
+    private fun loadGoogleOrDefaultImage(imageView: ImageView, user: com.google.firebase.auth.FirebaseUser) {
+        if (user.photoUrl != null) {
+            Log.d(tag, "Načítám profilový obrázek z Google URL pro ${user.uid}")
+            imageView.load(user.photoUrl) {
+                crossfade(true)
+                placeholder(R.drawable.ic_profile)
+                error(R.drawable.ic_profile)
+                transformations(CircleCropTransformation())
+            }
+        } else {
+            Log.d(tag, "Google URL nenalezeno, nastavuji výchozí ikonu.")
+            imageView.setImageResource(R.drawable.ic_profile)
+        }
+    }
+
+    // Uložení/načtení CESTY k souboru
+    private fun saveProfileImagePath(userId: String, path: String) {
+        val sharedPref = getSharedPreferences("profile_images", MODE_PRIVATE) ?: return
+        sharedPref.edit {
+            putString("profile_image_path_$userId", path)
+        }
+        Log.d(tag, "Uložena cesta '$path' pro uživatele $userId")
+    }
+
+    private fun getProfileImagePath(userId: String): String? {
+        val sharedPref = getSharedPreferences("profile_images", MODE_PRIVATE)
+        return sharedPref.getString("profile_image_path_$userId", null)
+    }
+
+    // Funkce pro smazání uložené cesty
+    private fun clearProfileImagePath(userId: String) {
+        val sharedPref = getSharedPreferences("profile_images", MODE_PRIVATE) ?: return
+        sharedPref.edit {
+            remove("profile_image_path_$userId")
+        }
+    }
+
+    // Nová funkce pro zobrazení dialogu možností
+    private fun showImageOptionsDialog(userId: String) {
+        val options = arrayOf(
+            getString(R.string.change_picture),
+            getString(R.string.remove_picture)
+        )
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.change_profile_picture_title)
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> { // Změnit
+                        Log.d(tag, "Volba: Změnit obrázek.")
+                        pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                    1 -> { // Odstranit
+                        Log.d(tag, "Volba: Odstranit obrázek.")
+                        deleteLocalProfileImage(userId) // Zavoláme funkci pro smazání
+                    }
+                }
+                dialog.dismiss() // Dialog se zavře sám po výběru, ale pro jistotu
+            }
+            .setNegativeButton(R.string.cancel) { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    // Funkce pro smazání lokálního obrázku a aktualizaci
+    private fun deleteLocalProfileImage(userId: String) {
+        val localImagePath = getProfileImagePath(userId)
+        if (localImagePath != null) {
+            // Smazání souboru provádíme mimo hlavní vlákno
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val file = File(localImagePath)
+                    if (file.exists()) {
+                        if (file.delete()) {
+                            Log.d(tag, "Lokální obrázek smazán: $localImagePath")
+                        } else {
+                            Log.w(tag, "Nepodařilo se smazat lokální obrázek: $localImagePath")
+                        }
+                    } else {
+                        Log.w(tag, "Lokální obrázek pro smazání nenalezen: $localImagePath")
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Chyba při mazání lokálního obrázku: $localImagePath", e)
+                } finally {
+                    // Po smazání (nebo pokusu) odstraníme cestu z SharedPreferences
+                    clearProfileImagePath(userId)
+                    // Aktualizujeme hlavičku na hlavním vlákně
+                    withContext(Dispatchers.Main) {
+                        updateNavHeader(findViewById(R.id.nav_view))
+                    }
+                }
+            }
+        } else {
+            Log.d(tag, "Pokus o smazání, ale lokální obrázek neexistuje.")
+            // Pro jistotu aktualizujeme hlavičku, kdyby tam byl zobrazen omylem
+            updateNavHeader(findViewById(R.id.nav_view))
         }
     }
 
@@ -421,14 +583,11 @@ class MainActivity : AppCompatActivity() {
     private fun scheduleNotificationWorker() {
         val workRequest = PeriodicWorkRequestBuilder<NotificationWorker>(1, TimeUnit.DAYS)
             .build()
-
-        // --- START ZMĚNY: Použití správného kontextu ---
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
             "NotificationWorker",
             ExistingPeriodicWorkPolicy.KEEP,
             workRequest
         )
-        // --- KONEC ZMĚNY ---
         Log.d(tag, "NotificationWorker naplánován.")
     }
 }
