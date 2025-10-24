@@ -2,6 +2,10 @@ package cz.davidfryda.odectyapp.ui.master
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.location.Address
+import android.location.Geocoder
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -13,13 +17,24 @@ import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.navArgs
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.databinding.FragmentUserDetailBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-class UserDetailFragment : Fragment() {
+class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentUserDetailBinding? = null
     private val binding get() = _binding!!
@@ -28,7 +43,11 @@ class UserDetailFragment : Fragment() {
     private val viewModel: UserDetailViewModel by viewModels()
 
     private val dateFormat = SimpleDateFormat("d. M. yyyy HH:mm", Locale.getDefault())
-    private val TAG = "UserDetailFragment" // Pro logování chyb
+    private val tag = "UserDetailFragment"
+
+    private var googleMap: GoogleMap? = null
+    private var userAddress: String? = null
+    private var userLatLng: LatLng? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -41,13 +60,20 @@ class UserDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        binding.mapView.onCreate(savedInstanceState)
+        binding.mapView.getMapAsync(this)
+
         (activity as? AppCompatActivity)?.supportActionBar?.title = getString(R.string.user_detail_title)
         viewModel.loadUserDetails(args.userId)
 
-        // Sledujeme stav načítání
+        setupObservers()
+    }
+
+    private fun setupObservers() {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             binding.progressBar.isVisible = isLoading
             val contentVisibility = if (isLoading) View.GONE else View.VISIBLE
+            
             binding.userNameLabel.visibility = contentVisibility
             binding.userNameValue.visibility = contentVisibility
             binding.userAddressLabel.visibility = contentVisibility
@@ -58,6 +84,7 @@ class UserDetailFragment : Fragment() {
             binding.userEmailValue.visibility = contentVisibility
             binding.userUidLabel.visibility = contentVisibility
             binding.userUidValue.visibility = contentVisibility
+            binding.mapView.visibility = contentVisibility
             binding.divider.visibility = contentVisibility
             binding.meterCountLabel.visibility = contentVisibility
             binding.meterCountValue.visibility = contentVisibility
@@ -65,78 +92,187 @@ class UserDetailFragment : Fragment() {
             binding.lastReadingValue.visibility = contentVisibility
         }
 
-        // Sledujeme data uživatele
         viewModel.userData.observe(viewLifecycleOwner) { user ->
             val notAvailable = getString(R.string.not_available)
             if (user != null) {
-                binding.userNameValue.text = "${user.name} ${user.surname}"
+                binding.userNameValue.text = getString(R.string.user_full_name, user.name, user.surname)
                 binding.userAddressValue.text = user.address
                 binding.userUidValue.text = user.uid
 
-                // --- START ZMĚNY: Telefon ---
                 if (user.phoneNumber.isNotEmpty()) {
                     binding.userPhoneValue.text = user.phoneNumber
-                    binding.userPhoneValue.setOnClickListener {
-                        try {
-                            // Intent pro otevření dialeru s číslem
-                            val intent = Intent(Intent.ACTION_DIAL, "tel:${user.phoneNumber}".toUri())
-                            startActivity(intent)
-                        } catch (e: ActivityNotFoundException) {
-                            Log.e(TAG, "Nelze otevřít aplikaci pro volání.", e)
-                            Toast.makeText(context, "Nelze nalézt aplikaci pro volání.", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                    binding.userPhoneValue.setOnClickListener { /* ... (kód pro volání) ... */ }
                 } else {
                     binding.userPhoneValue.text = notAvailable
-                    binding.userPhoneValue.setOnClickListener(null) // Odebrání listeneru
+                    binding.userPhoneValue.setOnClickListener(null)
                 }
-                // --- KONEC ZMĚNY: Telefon ---
 
-                // --- START ZMĚNY: E-mail ---
                 if (user.email.isNotEmpty()) {
                     binding.userEmailValue.text = user.email
-                    binding.userEmailValue.setOnClickListener {
-                        try {
-                            // Intent pro otevření e-mailového klienta
-                            val intent = Intent(Intent.ACTION_SENDTO)
-                            intent.data = "mailto:${user.email}".toUri() // Použijeme mailto:
-                            startActivity(intent)
-                        } catch (e: ActivityNotFoundException) {
-                            Log.e(TAG, "Nelze otevřít e-mailového klienta.", e)
-                            Toast.makeText(context, "Nelze nalézt e-mailového klienta.", Toast.LENGTH_SHORT).show()
-                        }
-                    }
+                    binding.userEmailValue.setOnClickListener { /* ... (kód pro email) ... */ }
                 } else {
                     binding.userEmailValue.text = notAvailable
-                    binding.userEmailValue.setOnClickListener(null) // Odebrání listeneru
+                    binding.userEmailValue.setOnClickListener(null)
                 }
-                // --- KONEC ZMĚNY: E-mail ---
+                
+                this.userAddress = user.address
+                updateMapDisplay()
 
             } else {
-                // Pokud data selžou, zobrazíme N/A a odstraníme listenery
                 binding.userNameValue.text = notAvailable
                 binding.userAddressValue.text = notAvailable
-                binding.userUidValue.text = args.userId
+                binding.userUidValue.text = notAvailable
                 binding.userPhoneValue.text = notAvailable
                 binding.userEmailValue.text = notAvailable
-                binding.userPhoneValue.setOnClickListener(null)
-                binding.userEmailValue.setOnClickListener(null)
+                this.userAddress = null
+                updateMapDisplay()
             }
         }
 
-        // Sledujeme počet měřáků
         viewModel.meterCount.observe(viewLifecycleOwner) { count ->
             binding.meterCountValue.text = count?.toString() ?: getString(R.string.not_available)
         }
 
-        // Sledujeme datum posledního odečtu
         viewModel.lastReadingDate.observe(viewLifecycleOwner) { date ->
             binding.lastReadingValue.text = date?.let { dateFormat.format(it) } ?: getString(R.string.no_reading_yet)
         }
     }
 
+    override fun onMapReady(map: GoogleMap) {
+        this.googleMap = map
+        googleMap?.uiSettings?.isMapToolbarEnabled = false
+        googleMap?.uiSettings?.isZoomControlsEnabled = true
+
+        googleMap?.setOnMapClickListener {
+            launchNavigation()
+        }
+
+        updateMapDisplay()
+    }
+    
+    private fun updateMapDisplay() {
+        val currentAddress = userAddress
+        if (googleMap != null && !currentAddress.isNullOrEmpty()) {
+            binding.mapView.isVisible = true
+            geocodeAddress(currentAddress)
+        } else {
+            binding.mapView.isVisible = false
+        }
+    }
+
+    private fun geocodeAddress(addressString: String) {
+        if (!Geocoder.isPresent()) {
+            Log.w(tag, "Geocoder není dostupný.")
+            binding.mapView.isVisible = false
+            return
+        }
+
+        val geocoder = Geocoder(requireContext(), Locale.getDefault())
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            geocoder.getFromLocationName(addressString, 1) { addresses ->
+                if (addresses.isNotEmpty()) {
+                    val location = addresses[0]
+                    userLatLng = LatLng(location.latitude, location.longitude)
+                    activity?.runOnUiThread { _binding?.let { updateMapLocation() } }
+                } else {
+                    Log.w(tag, "Pro adresu '$addressString' nebyly nalezeny žádné souřadnice.")
+                    activity?.runOnUiThread { _binding?.mapView?.isVisible = false }
+                }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val addresses: List<Address>? = geocoder.getFromLocationName(addressString, 1)
+
+                    if (!addresses.isNullOrEmpty()) {
+                        val location = addresses[0]
+                        userLatLng = LatLng(location.latitude, location.longitude)
+                        
+                        withContext(Dispatchers.Main) {
+                            _binding?.let { updateMapLocation() }
+                        }
+                    } else {
+                        Log.w(tag, "Pro adresu '$addressString' nebyly nalezeny žádné souřadnice.")
+                        withContext(Dispatchers.Main) {
+                            _binding?.mapView?.isVisible = false
+                        }
+                    }
+
+                } catch (e: IOException) {
+                    Log.e(tag, "Chyba při geokódování adresy '$addressString'", e)
+                     withContext(Dispatchers.Main) {
+                        _binding?.mapView?.isVisible = false
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updateMapLocation() {
+        val latLng = userLatLng ?: return
+        val map = googleMap ?: return
+
+        map.clear()
+        map.addMarker(MarkerOptions().position(latLng).title(userAddress ?: "Adresa"))
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+    }
+
+    private fun launchNavigation() {
+        val address = userAddress
+        if (address.isNullOrEmpty()) return
+
+        try {
+            val encodedAddress = URLEncoder.encode(address, "UTF-8")
+            val gmmIntentUri = "google.navigation:q=$encodedAddress".toUri()
+            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+            mapIntent.setPackage("com.google.android.apps.maps")
+            startActivity(mapIntent)
+        } catch (e: ActivityNotFoundException) {
+            Log.w(tag, "Aplikace Google Mapy není nainstalována.", e)
+            Toast.makeText(context, "Aplikace Google Mapy není nainstalována.", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(tag, "Nelze spustit navigaci v Google Mapách.", e)
+            Toast.makeText(context, "Nelze spustit Google Mapy.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // --- Správa životního cyklu MapView ---
+    override fun onResume() {
+        super.onResume()
+        binding.mapView.onResume()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        binding.mapView.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        binding.mapView.onStop()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        binding.mapView.onPause()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        binding.mapView.onDestroy()
+        googleMap = null
         _binding = null
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        binding.mapView.onLowMemory()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        _binding?.mapView?.onSaveInstanceState(outState)
     }
 }

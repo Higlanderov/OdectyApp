@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
     <application
         android:allowBackup="true"
@@ -18,7 +20,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Odecty"
         android:name=".OdectyApplication">
-        
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyCO5Y8tpp2DfS-gmcZi8JooXHCezpvz6-I" />
         <activity
             android:name=".MainActivity"
             android:exported="true">

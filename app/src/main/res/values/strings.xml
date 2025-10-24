@@ -75,6 +75,7 @@
     <string name="user_detail_meter_count_label">Počet měřáků:</string>
     <string name="user_detail_last_reading_label">Poslední odečet:</string>
     <string name="user_detail_email_label">Email:</string>
+    <string name="user_full_name">%1$s %2$s</string>
 
     <string-array name="months_array">
         <item>Leden</item>
