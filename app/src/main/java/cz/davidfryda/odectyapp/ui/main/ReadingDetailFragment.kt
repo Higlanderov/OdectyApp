@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.Toast
+import androidx.core.content.ContextCompat // <--- Import pro ContextCompat
 import androidx.core.view.isVisible // Import pro isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -57,7 +58,6 @@ class ReadingDetailFragment : Fragment() {
                 return@observe
             }
 
-
             val unit = when (args.meterType) {
                 "Elektřina" -> "kWh"
                 "Plyn" -> "m³"
@@ -79,21 +79,36 @@ class ReadingDetailFragment : Fragment() {
                 error(R.drawable.ic_error)
             }
 
+            // --- ŘÍZENÍ AKTIVITY A VZHLEDU TLAČÍTEK ---
+            val isLoading = viewModel.updateResult.value is UploadResult.Loading || viewModel.deleteResult.value is UploadResult.Loading
+            val isAdminEdit = reading.editedByAdmin && !args.isMasterView
+
             // Ovládání tlačítka Upravit
-            if (reading.editedByAdmin && !args.isMasterView) {
-                binding.editButton.text = getString(R.string.edited_by_admin) // Použití string resource
+            if (isAdminEdit) {
+                binding.editButton.text = getString(R.string.edited_by_admin)
                 binding.editButton.setIconResource(R.drawable.ic_admin)
                 binding.editButton.isEnabled = false // Běžný uživatel nemůže upravit
             } else {
                 binding.editButton.text = getString(R.string.edit_value)
-                binding.editButton.isEnabled = true // Master nebo neupravený odečet může upravit
+                // Tlačítko Upravit je aktivní, pokud není loading A odečet je synchronizovaný
+                binding.editButton.isEnabled = !isLoading && reading.isSynced // Úprava offline nemá smysl
                 binding.editButton.icon = null
             }
 
-            // --- ZAČÁTEK ZMĚNY ---
-            // Tlačítko Smazat je vždy aktivní (pokud odečet existuje)
-            binding.deleteButton.isEnabled = true
-            // --- KONEC ZMĚNY ---
+            // Ovládání tlačítka Smazat
+            if (isAdminEdit) {
+                // Pokud upravil admin a nejsme master, zablokujeme a vizuálně odlišíme
+                binding.deleteButton.text = getString(R.string.edited_by_admin) // Můžeme použít stejný text nebo jiný
+                binding.deleteButton.setIconResource(R.drawable.ic_admin) // Můžeme přidat ikonu zámku nebo admina
+                binding.deleteButton.isEnabled = false // Běžný uživatel nemůže smazat
+            } else {
+                // Jinak nastavíme standardní text a ikonu (pokud má mít ikonu)
+                binding.deleteButton.text = getString(R.string.delete_reading) // Standardní text
+                binding.deleteButton.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_delete) // Standardní ikona (pokud používáme ikonu)
+                // Tlačítko Smazat je aktivní, pokud není loading (master může vždy, uživatel jen pokud neupravil admin)
+                binding.deleteButton.isEnabled = !isLoading
+            }
+            // --- KONEC ŘÍZENÍ AKTIVITY A VZHLEDU TLAČÍTEK ---
         }
 
         binding.editButton.setOnClickListener {
@@ -110,7 +125,6 @@ class ReadingDetailFragment : Fragment() {
             } ?: Log.w(tag, "Edit button clicked but currentReading is null.") // Logování, pokud je currentReading null
         }
 
-        // --- ZAČÁTEK NOVÉ ČÁSTI ---
         // Listener pro tlačítko Smazat
         binding.deleteButton.setOnClickListener {
             currentReading?.let { reading ->
@@ -120,11 +134,18 @@ class ReadingDetailFragment : Fragment() {
 
         // Observer pro výsledek mazání
         viewModel.deleteResult.observe(viewLifecycleOwner) { result ->
-            // Progress bar - nyní sdílený, řízený stavem Loading jakékoli operace
             val isLoading = result is UploadResult.Loading || viewModel.updateResult.value is UploadResult.Loading
-            binding.progressBar.isVisible = isLoading // Přidáme ProgressBar do layoutu, pokud tam ještě není
-            binding.editButton.isEnabled = !isLoading && (currentReading?.isSynced ?: false) // Deaktivujeme tlačítka při načítání
-            binding.deleteButton.isEnabled = !isLoading && (currentReading != null)
+            binding.progressBar.isVisible = isLoading
+            // Znovu aplikujeme logiku pro isEnabled na základě aktuálního reading a nového isLoading
+            currentReading?.let { reading ->
+                val isAdminEdit = reading.editedByAdmin && !args.isMasterView
+                binding.editButton.isEnabled = !isLoading && reading.isSynced && !isAdminEdit
+                binding.deleteButton.isEnabled = !isLoading && (!isAdminEdit || args.isMasterView)
+            } ?: run { // Pokud currentReading je null (např. po smazání), deaktivujeme
+                binding.editButton.isEnabled = false
+                binding.deleteButton.isEnabled = false
+            }
+
 
             when(result) {
                 is UploadResult.Success -> {
@@ -145,15 +166,20 @@ class ReadingDetailFragment : Fragment() {
                 is UploadResult.Idle -> { /* Nic neděláme */ }
             }
         }
-        // --- KONEC NOVÉ ČÁSTI ---
 
         // Observer pro výsledek úpravy
         viewModel.updateResult.observe(viewLifecycleOwner) { result ->
-            // Progress bar - řízený stavem Loading
             val isLoading = result is UploadResult.Loading || viewModel.deleteResult.value is UploadResult.Loading
             binding.progressBar.isVisible = isLoading
-            binding.editButton.isEnabled = !isLoading && (currentReading?.isSynced ?: false)
-            binding.deleteButton.isEnabled = !isLoading && (currentReading != null)
+            // Znovu aplikujeme logiku pro isEnabled na základě aktuálního reading a nového isLoading
+            currentReading?.let { reading ->
+                val isAdminEdit = reading.editedByAdmin && !args.isMasterView
+                binding.editButton.isEnabled = !isLoading && reading.isSynced && !isAdminEdit
+                binding.deleteButton.isEnabled = !isLoading && (!isAdminEdit || args.isMasterView)
+            } ?: run { // Pokud currentReading je null
+                binding.editButton.isEnabled = false
+                binding.deleteButton.isEnabled = false
+            }
 
             when(result) {
                 is UploadResult.Success -> {
@@ -207,7 +233,6 @@ class ReadingDetailFragment : Fragment() {
             .show()
     }
 
-    // --- ZAČÁTEK NOVÉ ČÁSTI ---
     // Dialog pro potvrzení smazání
     private fun showDeleteConfirmationDialog(reading: Reading) {
         MaterialAlertDialogBuilder(requireContext())
@@ -221,12 +246,11 @@ class ReadingDetailFragment : Fragment() {
             }
             .show()
     }
-    // --- KONEC NOVÉ ČÁSTI ---
 
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
         Log.d(tag, "onDestroyView: Binding uvolněn.") // Log pro onDestroyView
     }
-    
+
 }

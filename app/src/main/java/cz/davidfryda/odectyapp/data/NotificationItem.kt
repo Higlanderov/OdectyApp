@@ -8,5 +8,9 @@ data class NotificationItem(
     val message: String = "",
     val read: Boolean = false,
     @ServerTimestamp
-    val timestamp: Date? = null
+    val timestamp: Date? = null,
+    val readingId: String? = null,
+    val userId: String? = null,
+    val meterId: String? = null,
+    val meterType: String? = null
 )

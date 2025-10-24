@@ -177,6 +177,13 @@
         android:id="@+id/notificationListFragment"
         android:name="cz.davidfryda.odectyapp.ui.notifications.NotificationListFragment"
         android:label="fragment_notification_list"
-        tools:layout="@layout/fragment_notification_list" />
+        tools:layout="@layout/fragment_notification_list" >
+        <!-- Není potřeba specifická akce zde, pokud použijeme globální akci -->
+        <!--
+        <action
+            android:id="@+id/action_notificationListFragment_to_readingDetailFragment"
+            app:destination="@id/readingDetailFragment" />
+         -->
+    </dialog><action android:id="@+id/action_global_readingDetailFragment" app:destination="@id/readingDetailFragment"/>
 </navigation>
 
