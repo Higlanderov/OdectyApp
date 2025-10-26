@@ -4,7 +4,6 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.location.Address
 import android.location.Geocoder
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -73,7 +72,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             binding.progressBar.isVisible = isLoading
             val contentVisibility = if (isLoading) View.GONE else View.VISIBLE
-            
+
             binding.userNameLabel.visibility = contentVisibility
             binding.userNameValue.visibility = contentVisibility
             binding.userAddressLabel.visibility = contentVisibility
@@ -101,20 +100,20 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
                 if (user.phoneNumber.isNotEmpty()) {
                     binding.userPhoneValue.text = user.phoneNumber
-                    binding.userPhoneValue.setOnClickListener { /* ... (kód pro volání) ... */ }
+                    // OnClickListener odstraněn, řeší autoLink v XML
                 } else {
                     binding.userPhoneValue.text = notAvailable
-                    binding.userPhoneValue.setOnClickListener(null)
+                    // OnClickListener odstraněn
                 }
 
                 if (user.email.isNotEmpty()) {
                     binding.userEmailValue.text = user.email
-                    binding.userEmailValue.setOnClickListener { /* ... (kód pro email) ... */ }
+                    // OnClickListener odstraněn, řeší autoLink v XML
                 } else {
                     binding.userEmailValue.text = notAvailable
-                    binding.userEmailValue.setOnClickListener(null)
+                    // OnClickListener odstraněn
                 }
-                
+
                 this.userAddress = user.address
                 updateMapDisplay()
 
@@ -149,7 +148,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
         updateMapDisplay()
     }
-    
+
     private fun updateMapDisplay() {
         val currentAddress = userAddress
         if (googleMap != null && !currentAddress.isNullOrEmpty()) {
@@ -189,7 +188,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                     if (!addresses.isNullOrEmpty()) {
                         val location = addresses[0]
                         userLatLng = LatLng(location.latitude, location.longitude)
-                        
+
                         withContext(Dispatchers.Main) {
                             _binding?.let { updateMapLocation() }
                         }
@@ -202,7 +201,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
                 } catch (e: IOException) {
                     Log.e(tag, "Chyba při geokódování adresy '$addressString'", e)
-                     withContext(Dispatchers.Main) {
+                    withContext(Dispatchers.Main) {
                         _binding?.mapView?.isVisible = false
                     }
                 }

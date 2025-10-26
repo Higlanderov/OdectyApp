@@ -74,7 +74,7 @@
             app:layout_constraintBaseline_toBaselineOf="@id/userPhoneLabel"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/userPhoneLabel"
-            tools:text="+420 123 456 789" />
+            android:autoLink="phone"    tools:text="+420 123 456 789" />
 
         <TextView
             android:id="@+id/userEmailLabel"
@@ -97,7 +97,7 @@
             app:layout_constraintBaseline_toBaselineOf="@id/userEmailLabel"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/userEmailLabel"
-            tools:text="uzivatel@email.com" />
+            android:autoLink="email"    tools:text="uzivatel@email.com" />
 
         <TextView
             android:id="@+id/userUidLabel"
