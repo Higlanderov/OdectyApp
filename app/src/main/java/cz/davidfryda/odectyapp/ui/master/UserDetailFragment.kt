@@ -17,6 +17,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController // Import je již přítomen
 import androidx.navigation.fragment.navArgs
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -63,16 +64,45 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         binding.mapView.getMapAsync(this)
 
         (activity as? AppCompatActivity)?.supportActionBar?.title = getString(R.string.user_detail_title)
+
         viewModel.loadUserDetails(args.userId)
 
         setupObservers()
+
+        binding.editDetailsButton.setOnClickListener {
+            val action = UserDetailFragmentDirections
+                .actionUserDetailFragmentToEditUserDetailFragment(args.userId)
+            findNavController().navigate(action)
+        }
     }
 
     private fun setupObservers() {
+
+        // --- ✨ ZAČÁTEK OPRAVY: Listener pro obnovení dat ---
+        // Naslouchá výsledku z EditUserDetailFragment.
+        // Musí být voláno ZDE (v setupObservers nebo onViewCreated), aby se observer zaregistroval.
+        findNavController().currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("refresh_data")
+            ?.observe(viewLifecycleOwner) { shouldRefresh ->
+
+                // Zkontrolujeme, zda je příznak nastaven na true
+                if (shouldRefresh == true) {
+                    Log.d(tag, "Přijat signál k obnovení dat (refresh_data=true). Načítám znovu.")
+
+                    // Zavoláme znovu načtení dat z ViewModelu
+                    viewModel.loadUserDetails(args.userId)
+
+                    // Resetujeme příznak, aby se data nenačetla znovu (např. při otočení obrazovky)
+                    findNavController().currentBackStackEntry?.savedStateHandle?.set("refresh_data", false)
+                }
+            }
+        // --- ✨ KONEC OPRAVY ---
+
+
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             binding.progressBar.isVisible = isLoading
             val contentVisibility = if (isLoading) View.GONE else View.VISIBLE
 
+            // Skrytí/zobrazení VŠECH prvků
             binding.userNameLabel.visibility = contentVisibility
             binding.userNameValue.visibility = contentVisibility
             binding.userAddressLabel.visibility = contentVisibility
@@ -89,6 +119,12 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             binding.meterCountValue.visibility = contentVisibility
             binding.lastReadingLabel.visibility = contentVisibility
             binding.lastReadingValue.visibility = contentVisibility
+
+            // Správa viditelnosti nových prvků
+            binding.editDetailsButton.visibility = contentVisibility
+            if (isLoading) {
+                binding.noteGroup.visibility = View.GONE
+            }
         }
 
         viewModel.userData.observe(viewLifecycleOwner) { user ->
@@ -98,20 +134,15 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 binding.userAddressValue.text = user.address
                 binding.userUidValue.text = user.uid
 
-                if (user.phoneNumber.isNotEmpty()) {
-                    binding.userPhoneValue.text = user.phoneNumber
-                    // OnClickListener odstraněn, řeší autoLink v XML
-                } else {
-                    binding.userPhoneValue.text = notAvailable
-                    // OnClickListener odstraněn
-                }
+                binding.userPhoneValue.text = user.phoneNumber.ifEmpty { notAvailable }
+                binding.userEmailValue.text = user.email.ifEmpty { notAvailable }
 
-                if (user.email.isNotEmpty()) {
-                    binding.userEmailValue.text = user.email
-                    // OnClickListener odstraněn, řeší autoLink v XML
+                // Zobrazení/skrytí poznámky
+                if (user.note.isNotEmpty()) {
+                    binding.userNoteValue.text = user.note
+                    binding.noteGroup.isVisible = true
                 } else {
-                    binding.userEmailValue.text = notAvailable
-                    // OnClickListener odstraněn
+                    binding.noteGroup.isVisible = false
                 }
 
                 this.userAddress = user.address
@@ -123,6 +154,10 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 binding.userUidValue.text = notAvailable
                 binding.userPhoneValue.text = notAvailable
                 binding.userEmailValue.text = notAvailable
+
+                // Skrytí poznámky, pokud uživatel neexistuje
+                binding.noteGroup.isVisible = false
+
                 this.userAddress = null
                 updateMapDisplay()
             }
@@ -151,10 +186,10 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
     private fun updateMapDisplay() {
         val currentAddress = userAddress
-        if (googleMap != null && !currentAddress.isNullOrEmpty()) {
+        if (googleMap != null && !currentAddress.isNullOrEmpty() && _binding != null) {
             binding.mapView.isVisible = true
             geocodeAddress(currentAddress)
-        } else {
+        } else if (_binding != null) {
             binding.mapView.isVisible = false
         }
     }
@@ -162,7 +197,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
     private fun geocodeAddress(addressString: String) {
         if (!Geocoder.isPresent()) {
             Log.w(tag, "Geocoder není dostupný.")
-            binding.mapView.isVisible = false
+            _binding?.mapView?.isVisible = false // Kontrola null bindingu
             return
         }
 
@@ -240,38 +275,16 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
     // --- Správa životního cyklu MapView ---
     override fun onResume() {
         super.onResume()
-        binding.mapView.onResume()
+        _binding?.mapView?.onResume() // Kontrola null
     }
 
     override fun onStart() {
         super.onStart()
-        binding.mapView.onStart()
+        _binding?.mapView?.onStart() // Kontrola null
     }
 
     override fun onStop() {
         super.onStop()
-        binding.mapView.onStop()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        binding.mapView.onPause()
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        binding.mapView.onDestroy()
-        googleMap = null
-        _binding = null
-    }
-
-    override fun onLowMemory() {
-        super.onLowMemory()
-        binding.mapView.onLowMemory()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        _binding?.mapView?.onSaveInstanceState(outState)
+        _binding?.mapView?.onStop() // Kontrola null
     }
 }

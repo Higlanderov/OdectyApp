@@ -1,9 +1,12 @@
 <resources>
-    <!-- Base application theme. -->
     <style name="Base.Theme.Odecty" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
     <style name="Theme.Odecty" parent="Base.Theme.Odecty" />
+
+    <style name="Widget.App.Button.Destructive" parent="Widget.Material3.Button">
+        <item name="backgroundTint">?attr/colorError</item>
+        <item name="android:textColor">?attr/colorOnError</item>
+    </style>
+
 </resources>

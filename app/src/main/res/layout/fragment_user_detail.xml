@@ -132,15 +132,34 @@
             app:liteMode="true"
             app:mapType="normal" />
 
-        <View
-            android:id="@+id/divider"
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_marginTop="24dp"
-            android:background="?attr/dividerHorizontal"
-            app:layout_constraintEnd_toEndOf="parent"
+        <TextView
+            android:id="@+id/userNoteLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/note"
+            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/mapView" />
+
+        <TextView
+            android:id="@+id/userNoteValue"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            app:layout_constraintBaseline_toBaselineOf="@id/userNoteLabel"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/userNoteLabel"
+            tools:text="Toto je velmi dlouhá poznámka, která se může zalomit na více řádků." />
+
+        <androidx.constraintlayout.widget.Group
+            android:id="@+id/noteGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            app:constraint_referenced_ids="userNoteLabel,userNoteValue"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/meterCountLabel"
@@ -183,6 +202,29 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/lastReadingLabel"
             tools:text="15. 10. 2025 10:30" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editDetailsButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="524dp"
+            android:text="@string/edit_user_details"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/noteGroup" />
+
+        <View
+            android:id="@+id/divider"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="16dp"
+            android:background="?attr/dividerHorizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/editDetailsButton" />
+
 
         <ProgressBar
             android:id="@+id/progressBar"

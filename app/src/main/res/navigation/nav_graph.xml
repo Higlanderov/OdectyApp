@@ -191,6 +191,22 @@
         <argument
             android:name="userId"
             app:argType="string" />
+
+        <action
+            android:id="@+id/action_userDetailFragment_to_editUserDetailFragment"
+            app:destination="@id/editUserDetailFragment" />
+
     </fragment>
     <action android:id="@+id/action_global_readingDetailFragment" app:destination="@id/readingDetailFragment"/>
+
+    <fragment
+        android:id="@+id/editUserDetailFragment"
+        android:name="cz.davidfryda.odectyapp.ui.master.EditUserDetailFragment"
+        android:label="@string/edit_user_details_title"
+        tools:layout="@layout/fragment_edit_user_detail">
+        <argument
+            android:name="userId"
+            app:argType="string" />
+    </fragment>
+
 </navigation>

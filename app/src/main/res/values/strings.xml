@@ -82,6 +82,11 @@
     <string name="change_profile_picture_title">Změnit profilový obrázek</string>
     <string name="change_picture">Změnit obrázek</string>
     <string name="remove_picture">Odstranit obrázek</string>
+    <string name="note">Poznámka</string>
+    <string name="phone_number">Telefonní číslo</string>
+    <string name="edit_user_details">Upravit údaje / Přidat poznámku</string>
+    <string name="edit_user_details_title">Upravit údaje klienta</string>
+    <string name="user_data_saved_successfully">Uživatelské údaje uloženy.</string>
 
     <string-array name="months_array">
         <item>Leden</item>

@@ -6,7 +6,9 @@ data class UserData(
     val surname: String = "",
     val address: String = "",
     val phoneNumber: String = "",
-    val email: String = ""
+    val email: String = "",
+    val note: String = "",
+    val isDisabled: Boolean = false
 )
 
 
