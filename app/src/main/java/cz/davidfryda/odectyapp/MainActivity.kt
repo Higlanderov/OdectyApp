@@ -206,16 +206,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateBadgeVisibility() {
-        val shouldShowBadge = (notificationMenuItem?.isVisible == true) && hasUnreadNotifications
-        Log.d(tag, "updateBadgeVisibility: shouldShowBadge = $shouldShowBadge (iconVisible=${notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
-
+        // Tuto funkci voláme z různých míst, proto logiku přesouváme do post bloku,
+        // abychom zabránili "race conditions"
         toolbar.post {
             try {
                 notificationBadge?.let { badge ->
+                    // --- ✨ OPRAVA: Výpočet 'shouldShowBadge' je PŘESUNUT SEM DOVNITŘ ---
+                    // Tím zajistíme, že se vždy použijí nejaktuálnější hodnoty
+                    val shouldShowBadge = (notificationMenuItem?.isVisible == true) && hasUnreadNotifications
+                    Log.d(tag, "updateBadgeVisibility (v post): shouldShowBadge = $shouldShowBadge (iconVisible=${notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
+
+                    // Nejprve badge vždy odpojíme
                     BadgeUtils.detachBadgeDrawable(badge, toolbar, R.id.action_notifications)
 
                     if (shouldShowBadge) {
-                        badge.number = notificationBadge?.number ?: 0
+                        // --- ✨ UKLIZENO: Odebrána redundantní řádka badge.number = ... ---
+                        // Číslo je již správně nastaveno v listeneru notifikací.
+
+                        // Znovu připojíme badge (který má již správné číslo)
                         BadgeUtils.attachBadgeDrawable(badge, toolbar, R.id.action_notifications)
                         Log.d(tag, "Badge připojen s počtem: ${badge.number}")
                     } else {
