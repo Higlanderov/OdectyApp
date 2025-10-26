@@ -32,6 +32,18 @@
             app:layout_constraintStart_toEndOf="@id/userNameLabel"
             tools:text="Jan Novák" />
 
+        <ImageView
+            android:id="@+id/blockIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/ic_block"
+            android:contentDescription="@string/blocked_user_icon_description"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/userNameLabel"
+            app:layout_constraintBottom_toBottomOf="@id/userNameLabel"
+            tools:visibility="visible" />
+
         <TextView
             android:id="@+id/userAddressLabel"
             android:layout_width="wrap_content"
@@ -161,6 +173,38 @@
             app:constraint_referenced_ids="userNoteLabel,userNoteValue"
             tools:visibility="visible" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/editDetailsButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="484dp"
+            android:text="@string/edit_user_details"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/noteGroup" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/blockUserButton"
+            style="@style/Widget.App.Button.Destructive"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/block_user"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/editDetailsButton" />
+
+        <View
+            android:id="@+id/divider"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="?attr/dividerHorizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/blockUserButton" />
+
         <TextView
             android:id="@+id/meterCountLabel"
             android:layout_width="wrap_content"
@@ -202,29 +246,6 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/lastReadingLabel"
             tools:text="15. 10. 2025 10:30" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/editDetailsButton"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="524dp"
-            android:text="@string/edit_user_details"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.0"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/noteGroup" />
-
-        <View
-            android:id="@+id/divider"
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_marginTop="16dp"
-            android:background="?attr/dividerHorizontal"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.0"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/editDetailsButton" />
-
 
         <ProgressBar
             android:id="@+id/progressBar"

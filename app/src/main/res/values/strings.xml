@@ -87,6 +87,15 @@
     <string name="edit_user_details">Upravit údaje / Přidat poznámku</string>
     <string name="edit_user_details_title">Upravit údaje klienta</string>
     <string name="user_data_saved_successfully">Uživatelské údaje uloženy.</string>
+    <string name="block_user">Zablokovat uživatele</string>
+    <string name="unblock_user">Odblokovat uživatele</string>
+    <string name="block_user_confirm_title">Potvrdit akci</string>
+    <string name="block_user_confirm_message">Opravdu chcete zablokovat tohoto uživatele? Ztratí přístup do aplikace.</string>
+    <string name="unblock_user_confirm_message">Opravdu chcete odblokovat tohoto uživatele? Získá zpět přístup do aplikace.</string>
+    <string name="user_blocked_successfully">Uživatel byl odblokován.</string>
+    <string name="user_unblocked_successfully">Uživatel byl zablokován.</string>
+    <string name="user_block_failed">Akci se nepodařilo provést. Zkuste to znovu.</string>
+    <string name="blocked_user_icon_description">Ikona zablokovaného uživatele</string>
 
     <string-array name="months_array">
         <item>Leden</item>
