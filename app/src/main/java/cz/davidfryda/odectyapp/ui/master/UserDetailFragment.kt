@@ -51,7 +51,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
     private var userAddress: String? = null
     private var userLatLng: LatLng? = null
 
-    // Proměnná pro uložení aktuálního stavu blokace
     private var currentUserIsDisabled: Boolean = false
 
     override fun onCreateView(
@@ -82,9 +81,13 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         binding.blockUserButton.setOnClickListener {
             showBlockConfirmationDialog()
         }
+
+        // NOVÉ: Listener pro tlačítko smazat uživatele
+        binding.deleteUserButton.setOnClickListener {
+            showDeleteConfirmationDialog()
+        }
     }
 
-    // Funkce pro zobrazení potvrzovacího dialogu (zůstává stejná)
     private fun showBlockConfirmationDialog() {
         val title = getString(R.string.block_user_confirm_title)
         val message = if (currentUserIsDisabled) {
@@ -109,9 +112,22 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             .show()
     }
 
+    // NOVÁ FUNKCE: Dialog pro potvrzení smazání uživatele
+    private fun showDeleteConfirmationDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.delete_user_confirm_title)
+            .setMessage(R.string.delete_user_confirm_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                Log.d(tag, "User confirmed deletion of userId=${args.userId}")
+                viewModel.deleteUser(args.userId)
+            }
+            .show()
+    }
+
     private fun setupObservers() {
 
-        // Listener pro obnovení dat po editaci (zůstává stejný)
+        // Listener pro obnovení dat po editaci
         findNavController().currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("refresh_data")
             ?.observe(viewLifecycleOwner) { shouldRefresh ->
                 if (shouldRefresh == true) {
@@ -121,17 +137,13 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 }
             }
 
-        // --- ✨ ZAČÁTEK OPRAVY: Úprava logiky viditelnosti při načítání ---
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
             Log.d(tag, "Observer isLoading triggered. isLoading = $isLoading")
             binding.progressBar.isVisible = isLoading
 
-            // Skryjeme hlavní obsah, POUZE pokud jde o úplně první načítání (když ještě nemáme data)
-            // Během operace blokace/odblokace obsah neskrýváme, jen deaktivujeme tlačítka.
             val isInitialLoading = isLoading && viewModel.userData.value == null
             val contentVisibility = if (isInitialLoading) View.GONE else View.VISIBLE
 
-            // Viditelnost prvků řídíme podle 'contentVisibility'
             binding.userNameLabel.visibility = contentVisibility
             binding.userNameValue.visibility = contentVisibility
             binding.userAddressLabel.visibility = contentVisibility
@@ -150,22 +162,21 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             binding.lastReadingValue.visibility = contentVisibility
             binding.editDetailsButton.visibility = contentVisibility
             binding.blockUserButton.visibility = contentVisibility
+            binding.deleteUserButton.visibility = contentVisibility // NOVÉ
 
-            // Poznámku a ikonu skryjeme jen při úplně prvním načítání, jinak je řídí data
             if (isInitialLoading) {
                 binding.noteGroup.visibility = View.GONE
                 binding.blockIcon.visibility = View.GONE
             }
 
-            // Deaktivujeme tlačítka během JAKÉKOLI operace (hlavní načítání NEBO blokace)
             binding.editDetailsButton.isEnabled = !isLoading
             binding.blockUserButton.isEnabled = !isLoading
+            binding.deleteUserButton.isEnabled = !isLoading // NOVÉ
             Log.d(tag, "Buttons enabled = ${!isLoading}")
         }
-        // --- ✨ KONEC OPRAVY ---
 
         viewModel.userData.observe(viewLifecycleOwner) { user ->
-            Log.d(tag, "Observer userData triggered. User: $user") // Log přijatých dat
+            Log.d(tag, "Observer userData triggered. User: $user")
             val notAvailable = getString(R.string.not_available)
             if (user != null) {
                 binding.userNameValue.text = getString(R.string.user_full_name, user.name, user.surname)
@@ -175,7 +186,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 binding.userPhoneValue.text = user.phoneNumber.ifEmpty { notAvailable }
                 binding.userEmailValue.text = user.email.ifEmpty { notAvailable }
 
-                // Zobrazení/skrytí poznámky
                 if (user.note.isNotEmpty()) {
                     binding.userNoteValue.text = user.note
                     binding.noteGroup.isVisible = true
@@ -183,15 +193,12 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                     binding.noteGroup.isVisible = false
                 }
 
-                // Logování stavu isDisabled PŘED aktualizací UI
                 Log.d(tag, "User data received. isDisabled = ${user.isDisabled}")
 
-                // Aktualizace stavu a UI pro blokaci
-                currentUserIsDisabled = user.isDisabled // VŽDY aktualizujeme lokální stav
-                binding.blockIcon.isVisible = user.isDisabled // VŽDY aktualizujeme viditelnost ikony
+                currentUserIsDisabled = user.isDisabled
+                binding.blockIcon.isVisible = user.isDisabled
                 Log.d(tag, "Setting blockIcon visibility to: ${user.isDisabled}")
 
-                // VŽDY aktualizujeme text tlačítka
                 if (user.isDisabled) {
                     binding.blockUserButton.setText(R.string.unblock_user)
                     Log.d(tag, "Setting button text to: Unblock")
@@ -203,7 +210,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 this.userAddress = user.address
                 updateMapDisplay()
 
-            } else { // Pokud user == null
+            } else {
                 Log.d(tag, "User data is null.")
                 binding.userNameValue.text = notAvailable
                 binding.userAddressValue.text = notAvailable
@@ -212,11 +219,11 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 binding.userEmailValue.text = notAvailable
 
                 binding.noteGroup.isVisible = false
-                binding.blockIcon.isVisible = false // Skryjeme ikonu
+                binding.blockIcon.isVisible = false
                 Log.d(tag, "Setting blockIcon visibility to: false (user is null)")
-                binding.blockUserButton.setText(R.string.block_user) // Výchozí text
+                binding.blockUserButton.setText(R.string.block_user)
                 Log.d(tag, "Setting button text to: Block (user is null)")
-                currentUserIsDisabled = false // Reset stavu
+                currentUserIsDisabled = false
 
                 this.userAddress = null
                 updateMapDisplay()
@@ -233,41 +240,51 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             binding.lastReadingValue.text = date?.let { dateFormat.format(it) } ?: getString(R.string.no_reading_yet)
         }
 
-        // Observer pro výsledek blokace (zobrazení Toast) (zůstává stejný)
         viewModel.blockResult.observe(viewLifecycleOwner) { result ->
             Log.d(tag, "Observer blockResult triggered. Result: $result")
             when (result) {
                 is SaveResult.Success -> {
-                    // --- ✨ ZAČÁTEK OPRAVY TOAST ZPRÁVY ---
-                    // Text Toastu určíme podle toho, jaký byl stav PŘED akcí
-                    // Proměnná 'currentUserIsDisabled' obsahuje stav před kliknutím na tlačítko
                     val messageResId = if (!currentUserIsDisabled) {
-                        // Pokud uživatel NEBYL zablokovaný (currentUserIsDisabled == false),
-                        // znamená to, že jsme ho právě ZABLOKOVALI.
                         R.string.user_blocked_successfully
                     } else {
-                        // Pokud uživatel BYL zablokovaný (currentUserIsDisabled == true),
-                        // znamená to, že jsme ho právě ODBLOKOVALI.
                         R.string.user_unblocked_successfully
                     }
                     Log.d(tag, "Block operation successful. MessageResId = $messageResId (based on previous state: $currentUserIsDisabled)")
-                    // --- ✨ KONEC OPRAVY TOAST ZPRÁVY ---
 
                     Toast.makeText(context, getString(messageResId), Toast.LENGTH_SHORT).show()
-                    viewModel.doneHandlingBlockResult() // Resetujeme stav pro Toast
+                    viewModel.doneHandlingBlockResult()
                 }
                 is SaveResult.Error -> {
                     Log.w(tag, "Block operation failed: ${result.message}")
                     Toast.makeText(context, getString(R.string.user_block_failed) + ": ${result.message}", Toast.LENGTH_LONG).show()
-                    viewModel.doneHandlingBlockResult() // Resetujeme stav pro Toast
+                    viewModel.doneHandlingBlockResult()
                 }
                 SaveResult.Idle -> { Log.d(tag, "Block result is Idle.") }
                 is SaveResult.Loading -> { Log.d(tag, "Block operation is Loading.") }
             }
         }
-    }
 
-    // ... (zbytek souboru UserDetailFragment.kt zůstává beze změny) ...
+        // NOVÝ OBSERVER: Sledování výsledku smazání uživatele
+        viewModel.deleteUserResult.observe(viewLifecycleOwner) { result ->
+            Log.d(tag, "Observer deleteUserResult triggered. Result: $result")
+            when (result) {
+                is SaveResult.Success -> {
+                    Log.d(tag, "Delete operation successful.")
+                    Toast.makeText(context, getString(R.string.user_deleted_successfully), Toast.LENGTH_SHORT).show()
+                    viewModel.doneHandlingDeleteResult()
+                    // Navigace zpět na seznam uživatelů
+                    findNavController().popBackStack()
+                }
+                is SaveResult.Error -> {
+                    Log.w(tag, "Delete operation failed: ${result.message}")
+                    Toast.makeText(context, getString(R.string.user_delete_failed) + ": ${result.message}", Toast.LENGTH_LONG).show()
+                    viewModel.doneHandlingDeleteResult()
+                }
+                SaveResult.Idle -> { Log.d(tag, "Delete result is Idle.") }
+                is SaveResult.Loading -> { Log.d(tag, "Delete operation is Loading.") }
+            }
+        }
+    }
 
     override fun onMapReady(map: GoogleMap) {
         this.googleMap = map
@@ -298,7 +315,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             try {
                 geocoder.getFromLocationName(addressString, 1) { addresses ->
                     activity?.runOnUiThread {
-                        if (_binding == null) return@runOnUiThread // Fragment už neexistuje
+                        if (_binding == null) return@runOnUiThread
                         if (addresses.isNotEmpty()) {
                             val location = addresses[0]
                             userLatLng = LatLng(location.latitude, location.longitude)
@@ -309,7 +326,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                         }
                     }
                 }
-            } catch (e: Exception) { // Zachycení obecné výjimky pro jistotu
+            } catch (e: Exception) {
                 Log.e(tag, "Chyba při geokódování (API 33+): ${e.message}", e)
                 activity?.runOnUiThread { _binding?.mapView?.isVisible = false }
             }
@@ -319,7 +336,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 try {
                     val addresses: List<Address>? = geocoder.getFromLocationName(addressString, 1)
                     withContext(Dispatchers.Main) {
-                        if (_binding == null) return@withContext // Fragment už neexistuje
+                        if (_binding == null) return@withContext
                         if (!addresses.isNullOrEmpty()) {
                             val location = addresses[0]
                             userLatLng = LatLng(location.latitude, location.longitude)
@@ -332,7 +349,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                 } catch (e: IOException) {
                     Log.e(tag, "Chyba při geokódování adresy '$addressString'", e)
                     withContext(Dispatchers.Main) { _binding?.mapView?.isVisible = false }
-                } catch (e: Exception) { // Zachycení obecné výjimky
+                } catch (e: Exception) {
                     Log.e(tag, "Neočekávaná chyba při geokódování: ${e.message}", e)
                     withContext(Dispatchers.Main) { _binding?.mapView?.isVisible = false }
                 }
@@ -341,7 +358,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun updateMapLocation() {
-        // Kontrola, zda Fragment a jeho View stále existují
         if (_binding == null || googleMap == null || userLatLng == null) {
             Log.w(tag, "updateMapLocation called but binding, map or latLng is null.")
             return
@@ -372,7 +388,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    // --- Správa životního cyklu MapView ---
     override fun onResume() { super.onResume(); _binding?.mapView?.onResume() }
     override fun onStart() { super.onStart(); _binding?.mapView?.onStart() }
     override fun onStop() { super.onStop(); _binding?.mapView?.onStop() }

@@ -86,7 +86,8 @@
             app:layout_constraintBaseline_toBaselineOf="@id/userPhoneLabel"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/userPhoneLabel"
-            android:autoLink="phone"    tools:text="+420 123 456 789" />
+            android:autoLink="phone"
+            tools:text="+420 123 456 789" />
 
         <TextView
             android:id="@+id/userEmailLabel"
@@ -109,7 +110,8 @@
             app:layout_constraintBaseline_toBaselineOf="@id/userEmailLabel"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/userEmailLabel"
-            android:autoLink="email"    tools:text="uzivatel@email.com" />
+            android:autoLink="email"
+            tools:text="uzivatel@email.com" />
 
         <TextView
             android:id="@+id/userUidLabel"
@@ -177,10 +179,10 @@
             android:id="@+id/editDetailsButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="484dp"
+            android:layout_marginTop="444dp"
             android:text="@string/edit_user_details"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/noteGroup" />
 
@@ -195,6 +197,22 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/editDetailsButton" />
 
+        <!-- NOVÉ TLAČÍTKO SMAZAT UŽIVATELE -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/deleteUserButton"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/delete_user"
+            android:textColor="?attr/colorError"
+            app:icon="@drawable/ic_delete"
+            app:iconTint="?attr/colorError"
+            app:strokeColor="?attr/colorError"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/blockUserButton" />
+
         <View
             android:id="@+id/divider"
             android:layout_width="0dp"
@@ -203,7 +221,7 @@
             android:background="?attr/dividerHorizontal"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/blockUserButton" />
+            app:layout_constraintTop_toBottomOf="@id/deleteUserButton" />
 
         <TextView
             android:id="@+id/meterCountLabel"

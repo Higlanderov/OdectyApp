@@ -92,10 +92,15 @@
     <string name="block_user_confirm_title">Potvrdit akci</string>
     <string name="block_user_confirm_message">Opravdu chcete zablokovat tohoto uživatele? Ztratí přístup do aplikace.</string>
     <string name="unblock_user_confirm_message">Opravdu chcete odblokovat tohoto uživatele? Získá zpět přístup do aplikace.</string>
-    <string name="user_blocked_successfully">Uživatel byl odblokován.</string>
-    <string name="user_unblocked_successfully">Uživatel byl zablokován.</string>
-    <string name="user_block_failed">Akci se nepodařilo provést. Zkuste to znovu.</string>
+    <string name="user_blocked_successfully">Uživatel byl zablokován.</string>
+    <string name="user_unblocked_successfully">Uživatel byl odblokován.</string>
+    <string name="user_block_failed">Akci pro blokování/odblokování se nepodařilo provést.</string>
     <string name="blocked_user_icon_description">Ikona zablokovaného uživatele</string>
+    <string name="delete_user">Smazat uživatele</string>
+    <string name="delete_user_confirm_title">Smazat uživatele?</string>
+    <string name="delete_user_confirm_message">Opravdu chcete trvale smazat tohoto uživatele a všechna jeho data (včetně měřáků a odečtů)? Tato akce je nevratná.</string>
+    <string name="user_deleted_successfully">Uživatel byl úspěšně smazán.</string>
+    <string name="user_delete_failed">Smazání uživatele se nezdařilo.</string>
 
     <string-array name="months_array">
         <item>Leden</item>
