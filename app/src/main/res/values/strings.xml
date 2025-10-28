@@ -101,6 +101,7 @@
     <string name="delete_user_confirm_message">Opravdu chcete trvale smazat tohoto uživatele a všechna jeho data (včetně měřáků a odečtů)? Tato akce je nevratná.</string>
     <string name="user_deleted_successfully">Uživatel byl úspěšně smazán.</string>
     <string name="user_delete_failed">Smazání uživatele se nezdařilo.</string>
+    <string name="default_web_client_id">945101370255-cbjrc6423gvvqkuf5gn83h994bb33ul3.apps.googleusercontent.com</string>
 
     <string-array name="months_array">
         <item>Leden</item>

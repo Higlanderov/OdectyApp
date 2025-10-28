@@ -71,8 +71,35 @@ class AuthViewModel : ViewModel() {
             _authResult.value = AuthResult.Loading
             try {
                 val result = auth.createUserWithEmailAndPassword(email, pass).await()
-                // OPRAVENO: Přidán třetí parametr 'isNewUser = true'
-                _authResult.value = AuthResult.Success(result.user, false, true)
+
+                if (result.user != null) {
+                    val newUser = result.user!!
+
+                    // --- ✨ OPRAVENÁ DATA PRO NOVÉHO UŽIVATELE ---
+                    // HashMap uživatele NESMÍ obsahovat pole "uid",
+                    // protože ID dokumentu je samo o sobě UID.
+                    val userData = hashMapOf(
+                        "uid" to newUser.uid,
+                        "email" to newUser.email,
+                        "name" to "",
+                        "surname" to "",
+                        "address" to "",
+                        "phoneNumber" to "",
+                        "note" to "",
+                        "fcmToken" to "", // Přidáno chybějící pole (pro čistotu)
+                        "role" to "user",
+                        "isDisabled" to false
+                    )
+
+                    // Uložíme dokument do Firestore
+                    db.collection("users").document(newUser.uid).set(userData).await()
+
+                    _authResult.value = AuthResult.Success(newUser, false, true)
+
+                } else {
+                    _authResult.value = AuthResult.Error("Nepodařilo se získat informace o uživateli po registraci.")
+                }
+
             } catch (e: Exception) {
                 _authResult.value = AuthResult.Error(e.message ?: "Neznámá chyba.")
             }
