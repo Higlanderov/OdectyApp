@@ -8,7 +8,7 @@
     <string name="meter_icon_description">Ikona měřiče</string>
     <string name="take_reading_button">Provést nový odečet</string>
     <string name="master_user_detail_no_meters">Tento uživatel zatím nemá přidané žádné měřáky.</string>
-    <string name="search_by_name_address">Hledat (jméno, adresa)...</string>
+    <string name="search_by_name_address">Hledat (jméno, adresa)…</string>
     <string name="month">Měsíc</string>
     <string name="reading_status">Status odečtu</string>
     <string name="apply">Aplikovat</string>
@@ -57,7 +57,6 @@
     <string name="delete_reading">Smazat odečet</string>
     <string name="delete_reading_confirmation">Opravdu chcete smazat tento odečet? Tato akce je nevratná.</string>
     <string name="delete">Smazat</string>
-    <string name="user_detail_title">Detaily uživatele</string>
     <string name="not_available">N/A</string>
     <string name="no_reading_yet">Zatím žádný odečet</string>
     <string name="user_info_title">Doplňte své údaje</string>
@@ -106,6 +105,23 @@
     <string name="blocked_users">Zablokovaní</string>
     <string name="active_users">Odblokovaní</string>
     <string name="all_users">Vše</string>
+    <string name="changes_saved_successfully">Změny úspěšně uloženy.</string>
+    <string name="downloading_images_progress">Stahuji obrázky… (%1$d/%2$d)</string>
+    <string name="images_exported_success">Obrázky úspěšně exportovány (%1$d bytes).</string>
+    <string name="filter_is_active">Filtr je Aktivní</string>
+    <string name="export_images_zip">Exportovat obrázky (ZIP)</string>
+    <string name="export_excel_xlsx">Exportovat do Excel (XLSX)</string>
+    <string name="export_csv">Exportovat do CSV</string>
+    <string name="manual_reading_photo_preview_description">Náhled pořízené fotografie</string>
+    <string name="manual_reading_helper_text">Pro desetinná místa (červená čísla) použijte tečku "."</string>
+    <string name="manual_reading_value_hint">Zadejte hodnotu z měřáku</string>
+    <string name="success_icon_description">Úspěch</string>
+    <string name="successfully_saved">Úspěšně uloženo</string>
+    <string name="master_user_meters_title">Přehled uživatele - %1$s</string>
+    <string name="user_detail_title">Přehled - %1$s</string>
+    <string name="user_detail_title_with_name">Přehled - %1$s</string>
+    <string name="user_detail_title_default">Přehled uživatele</string>
+    <string name="master_user_detail_default_title">Měřáky uživatele</string>
 
     <string-array name="months_array">
         <item>Leden</item>
@@ -121,4 +137,5 @@
         <item>Listopad</item>
         <item>Prosinec</item>
     </string-array>
+
 </resources>

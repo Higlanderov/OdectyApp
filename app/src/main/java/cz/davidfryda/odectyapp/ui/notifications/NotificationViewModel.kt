@@ -20,30 +20,30 @@ class NotificationViewModel : ViewModel() {
     private val _notifications = MutableLiveData<List<NotificationItem>>()
     val notifications: LiveData<List<NotificationItem>> = _notifications
 
-    private val TAG = "NotificationViewModel" // Tag pro logování
+    private val tag = "NotificationViewModel" // Tag pro logování
 
 
     fun loadNotifications() {
         if (currentUser == null) return
-        Log.d(TAG, "loadNotifications: Načítám notifikace pro ${currentUser.uid}") // LOG
+        Log.d(tag, "loadNotifications: Načítám notifikace pro ${currentUser.uid}") // LOG
         db.collection("notifications").document(currentUser.uid).collection("items")
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .limit(50) // Zobrazíme max 50 posledních
             .addSnapshotListener { snapshots, error ->
                 if (error != null) {
-                    Log.w(TAG, "loadNotifications: Chyba při načítání:", error) // LOG CHYBY
+                    Log.w(tag, "loadNotifications: Chyba při načítání:", error) // LOG CHYBY
                     return@addSnapshotListener
                 }
                 _notifications.value = snapshots?.map {
                     it.toObject(NotificationItem::class.java).copy(id = it.id)
                 } ?: emptyList()
-                Log.d(TAG, "loadNotifications: Listener obdržel ${snapshots?.size() ?: 0} notifikací.") // LOG
+                Log.d(tag, "loadNotifications: Listener obdržel ${snapshots?.size() ?: 0} notifikací.") // LOG
             }
     }
 
     fun markAllAsRead() {
         if (currentUser == null) return
-        Log.d(TAG, "markAllAsRead: Spuštěno pro ${currentUser.uid}") // LOG
+        Log.d(tag, "markAllAsRead: Spuštěno pro ${currentUser.uid}") // LOG
         viewModelScope.launch {
             try {
                 val unreadSnapshot = db.collection("notifications").document(currentUser.uid).collection("items")
@@ -52,21 +52,21 @@ class NotificationViewModel : ViewModel() {
                     .await()
 
                 if (unreadSnapshot.isEmpty) {
-                    Log.d(TAG, "markAllAsRead: Žádné nepřečtené notifikace k označení.") // LOG
+                    Log.d(tag, "markAllAsRead: Žádné nepřečtené notifikace k označení.") // LOG
                     return@launch
                 }
 
-                Log.d(TAG, "markAllAsRead: Nalezeno ${unreadSnapshot.size()} nepřečtených notifikací k označení.") // LOG
+                Log.d(tag, "markAllAsRead: Nalezeno ${unreadSnapshot.size()} nepřečtených notifikací k označení.") // LOG
 
                 val batch = db.batch()
                 unreadSnapshot.documents.forEach { doc ->
                     batch.update(doc.reference, "read", true)
                 }
                 batch.commit().await()
-                Log.d(TAG, "markAllAsRead: ${unreadSnapshot.size()} notifikací úspěšně označeno jako přečtené.") // LOG ÚSPĚCHU
+                Log.d(tag, "markAllAsRead: ${unreadSnapshot.size()} notifikací úspěšně označeno jako přečtené.") // LOG ÚSPĚCHU
             } catch (e: Exception) {
                 // LOG CHYBY PŘI ZÁPISU
-                Log.e(TAG, "markAllAsRead: Chyba při označování notifikací jako přečtených:", e)
+                Log.e(tag, "markAllAsRead: Chyba při označování notifikací jako přečtených:", e)
             }
         }
     }

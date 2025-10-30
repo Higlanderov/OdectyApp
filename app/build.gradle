@@ -84,6 +84,9 @@ dependencies {
 
     // Google authentication
     implementation libs.google.auth
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
 
     //Export do XLSX
     implementation libs.apache.poi

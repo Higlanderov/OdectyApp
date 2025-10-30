@@ -12,15 +12,16 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:icon="@drawable/ic_image"
-        android:text="Exportovat obrázky (ZIP)" />
+        android:text="@string/export_images_zip" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/exportXlsxButton"
         style="@style/Widget.Material3.Button.TonalButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:icon="@drawable/ic_excel"
-        android:text="Exportovat do Excel (XLSX)" />
+        android:layout_marginTop="8dp"
+        android:text="@string/export_excel_xlsx"
+        app:icon="@drawable/ic_excel" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/exportCsvButton"
@@ -28,7 +29,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        app:icon="@drawable/ic_csv"
-        android:text="Exportovat do CSV" />
+        android:text="@string/export_csv"
+        app:icon="@drawable/ic_csv" />
 
 </LinearLayout>

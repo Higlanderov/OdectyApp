@@ -1,25 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/successMessageTextView"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    app:drawableTopCompat="@drawable/ic_success_check"
+    android:drawablePadding="16dp"
+    app:drawableTint="?attr/colorPrimary"
     android:gravity="center"
-    android:orientation="vertical"
-    android:padding="32dp">
-
-    <ImageView
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:contentDescription="Úspěch"
-        android:src="@drawable/ic_success_check"
-        app:tint="?attr/colorPrimary" />
-
-    <TextView
-        android:id="@+id/successMessageTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Úspěšně uloženo"
-        android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-</LinearLayout>
+    android:padding="32dp"
+    android:text="@string/successfully_saved"
+    android:textAppearance="?attr/textAppearanceTitleMedium" />

@@ -8,7 +8,6 @@ import androidx.navigation.fragment.findNavController
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import cz.davidfryda.odectyapp.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -32,7 +31,7 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
                     } else {
                         findNavController().navigate(R.id.action_splashFragment_to_mainFragment)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     findNavController().navigate(R.id.action_splashFragment_to_loginFragment)
                 }
             } else {

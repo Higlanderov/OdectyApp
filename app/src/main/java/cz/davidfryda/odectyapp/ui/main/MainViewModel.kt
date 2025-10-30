@@ -28,7 +28,7 @@ class MainViewModel : ViewModel() {
     private val _meters = MutableLiveData<List<Meter>>()
     val meters: LiveData<List<Meter>> = _meters
 
-    private val _isLoading = MutableLiveData<Boolean>(false) // Výchozí hodnota false
+    private val _isLoading = MutableLiveData(false) // Výchozí hodnota false
     val isLoading: LiveData<Boolean> = _isLoading
 
     // Přejmenováno pro jasnost (výsledek přidání)
@@ -45,7 +45,7 @@ class MainViewModel : ViewModel() {
     private val _deleteResult = MutableLiveData<SaveResult>(SaveResult.Idle) // Inicializace na Idle
     val deleteResult: LiveData<SaveResult> = _deleteResult
 
-    private val TAG = "MainViewModel" // Tag pro logování
+    private val tag = "MainViewModel" // tag pro logování
 
     init {
         fetchMeters()
@@ -53,7 +53,7 @@ class MainViewModel : ViewModel() {
 
     private fun fetchMeters() {
         if (currentUser == null) {
-            Log.w(TAG, "fetchMeters: Uživatel není přihlášen.")
+            Log.w(tag, "fetchMeters: Uživatel není přihlášen.")
             _isLoading.value = false // Ukončíme načítání
             return
         }
@@ -64,7 +64,7 @@ class MainViewModel : ViewModel() {
             .addSnapshotListener { snapshots, error ->
                 _isLoading.value = false // Skončili jsme načítání (nebo přišla chyba)
                 if (error != null) {
-                    Log.e(TAG, "fetchMeters: Chyba při načítání měřáků", error)
+                    Log.e(tag, "fetchMeters: Chyba při načítání měřáků", error)
                     // Zde bychom mohli nastavit nějaký chybový stav, např. _meters.value = emptyList() a zobrazit Toast
                     return@addSnapshotListener
                 }
@@ -72,10 +72,10 @@ class MainViewModel : ViewModel() {
                     _meters.value = snapshots.map { doc ->
                         doc.toObject(Meter::class.java).copy(id = doc.id)
                     }.sortedBy { it.name } // Seřadíme podle jména
-                    Log.d(TAG, "fetchMeters: Načteno ${_meters.value?.size ?: 0} měřáků.")
+                    Log.d(tag, "fetchMeters: Načteno ${_meters.value?.size ?: 0} měřáků.")
                 } else {
                     _meters.value = emptyList() // Pokud je snapshot null, nastavíme prázdný seznam
-                    Log.d(TAG, "fetchMeters: Snapshot je null.")
+                    Log.d(tag, "fetchMeters: Snapshot je null.")
                 }
             }
     }
@@ -92,10 +92,10 @@ class MainViewModel : ViewModel() {
             try {
                 db.collection("users").document(currentUser.uid).collection("meters").add(newMeter).await()
                 _addResult.value = SaveResult.Success
-                Log.d(TAG, "addMeter: Měřák '$name' úspěšně přidán.")
+                Log.d(tag, "addMeter: Měřák '$name' úspěšně přidán.")
             } catch (e: Exception) {
                 _addResult.value = SaveResult.Error(e.message ?: "Chyba při ukládání měřáku.")
-                Log.e(TAG, "addMeter: Chyba při přidávání měřáku '$name'", e)
+                Log.e(tag, "addMeter: Chyba při přidávání měřáku '$name'", e)
             }
         }
     }
@@ -103,7 +103,7 @@ class MainViewModel : ViewModel() {
     // --- Resetovací funkce pro Add ---
     fun resetAddResult() {
         _addResult.value = SaveResult.Idle
-        Log.d(TAG, "resetAddResult: Stav resetován na Idle.")
+        Log.d(tag, "resetAddResult: Stav resetován na Idle.")
     }
 
     // --- NOVÉ METODY ---
@@ -126,10 +126,10 @@ class MainViewModel : ViewModel() {
                     .update("name", newName)
                     .await()
                 _updateResult.value = SaveResult.Success
-                Log.d(TAG, "updateMeterName: Název měřáku $meterId úspěšně změněn na '$newName'.")
+                Log.d(tag, "updateMeterName: Název měřáku $meterId úspěšně změněn na '$newName'.")
             } catch (e: Exception) {
                 _updateResult.value = SaveResult.Error(e.message ?: "Chyba při úpravě názvu měřáku.")
-                Log.e(TAG, "updateMeterName: Chyba při úpravě měřáku $meterId", e)
+                Log.e(tag, "updateMeterName: Chyba při úpravě měřáku $meterId", e)
             }
         }
     }
@@ -138,7 +138,7 @@ class MainViewModel : ViewModel() {
     // Resetovací funkce pro Update
     fun resetUpdateResult() {
         _updateResult.value = SaveResult.Idle
-        Log.d(TAG, "resetUpdateResult: Stav resetován na Idle.")
+        Log.d(tag, "resetUpdateResult: Stav resetován na Idle.")
     }
     // --- KONEC NOVÉ ČÁSTI ---
 
@@ -175,7 +175,7 @@ class MainViewModel : ViewModel() {
                         }
                     }
                 }
-                Log.d(TAG, "deleteMeter: Nalezeno ${readingIdsToDelete.size} odečtů a ${photoUrlsToDelete.size} fotek ke smazání pro měřák $meterId.")
+                Log.d(tag, "deleteMeter: Nalezeno ${readingIdsToDelete.size} odečtů a ${photoUrlsToDelete.size} fotek ke smazání pro měřák $meterId.")
 
                 // Použijeme WriteBatch pro atomické smazání odečtů a měřáku
                 val batch = db.batch()
@@ -193,7 +193,7 @@ class MainViewModel : ViewModel() {
 
                 // 4. Provést batch zápis (smazání dokumentů)
                 batch.commit().await()
-                Log.d(TAG, "deleteMeter: Dokumenty měřáku a odečtů pro $meterId smazány z Firestore.")
+                Log.d(tag, "deleteMeter: Dokumenty měřáku a odečtů pro $meterId smazány z Firestore.")
 
                 // 5. Smazat fotky ze Storage (mimo batch, postupně)
                 // Přepneme na IO dispatcher pro síťové operace mazání fotek
@@ -206,18 +206,18 @@ class MainViewModel : ViewModel() {
                             deletedPhotosCount++
                         } catch (e: Exception) {
                             // Logujeme chybu, ale pokračujeme v mazání ostatních fotek
-                            Log.e(TAG, "deleteMeter: Chyba při mazání fotky $photoUrl ze Storage", e)
+                            Log.e(tag, "deleteMeter: Chyba při mazání fotky $photoUrl ze Storage", e)
                         }
                     }
-                    Log.d(TAG, "deleteMeter: Smazáno $deletedPhotosCount z ${photoUrlsToDelete.size} fotek ze Storage.")
+                    Log.d(tag, "deleteMeter: Smazáno $deletedPhotosCount z ${photoUrlsToDelete.size} fotek ze Storage.")
                 }
 
                 _deleteResult.value = SaveResult.Success
-                Log.d(TAG, "deleteMeter: Měřák $meterId a jeho data úspěšně smazána.")
+                Log.d(tag, "deleteMeter: Měřák $meterId a jeho data úspěšně smazána.")
 
             } catch (e: Exception) {
                 _deleteResult.value = SaveResult.Error(e.message ?: "Chyba při mazání měřáku.")
-                Log.e(TAG, "deleteMeter: Chyba při mazání měřáku $meterId", e)
+                Log.e(tag, "deleteMeter: Chyba při mazání měřáku $meterId", e)
             }
         }
     }
@@ -225,7 +225,7 @@ class MainViewModel : ViewModel() {
     // --- Resetovací funkce pro Delete ---
     fun resetDeleteResult() {
         _deleteResult.value = SaveResult.Idle
-        Log.d(TAG, "resetDeleteResult: Stav resetován na Idle.")
+        Log.d(tag, "resetDeleteResult: Stav resetován na Idle.")
     }
 
     // Pomocná funkce pro kontrolu připojení k internetu

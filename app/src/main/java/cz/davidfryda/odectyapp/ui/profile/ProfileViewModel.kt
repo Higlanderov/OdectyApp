@@ -17,7 +17,7 @@ import kotlinx.coroutines.tasks.await
 class ProfileViewModel : ViewModel() {
     private val db = Firebase.firestore
     private val currentUser = Firebase.auth.currentUser
-    private val TAG = "ProfileViewModel"
+    private val tag = "ProfileViewModel"
 
     private val _userData = MutableLiveData<UserData?>()
     val userData: LiveData<UserData?> = _userData
@@ -29,24 +29,24 @@ class ProfileViewModel : ViewModel() {
     fun loadUserData() {
         val user = currentUser
         if (user == null) {
-            Log.w(TAG, "loadUserData: Aktuální uživatel je null.")
+            Log.w(tag, "loadUserData: Aktuální uživatel je null.")
             _userData.value = null
             return
         }
         val userId = user.uid
-        Log.d(TAG, "loadUserData: Načítám data pro uživatele $userId")
+        Log.d(tag, "loadUserData: Načítám data pro uživatele $userId")
         db.collection("users").document(userId).get()
             .addOnSuccessListener { document ->
                 _userData.value = document.toObject(UserData::class.java)
                 if (_userData.value != null) {
-                    Log.d(TAG, "loadUserData: Data uživatele načtena úspěšně.")
+                    Log.d(tag, "loadUserData: Data uživatele načtena úspěšně.")
                 } else {
-                    Log.w(TAG, "loadUserData: Dokument uživatele $userId nenalezen, je prázdný nebo se nepodařilo převést na UserData.")
+                    Log.w(tag, "loadUserData: Dokument uživatele $userId nenalezen, je prázdný nebo se nepodařilo převést na UserData.")
                     _userData.value = null
                 }
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "loadUserData: Chyba při načítání dat uživatele.", e)
+                Log.e(tag, "loadUserData: Chyba při načítání dat uživatele.", e)
                 _userData.value = null
             }
     }
@@ -82,7 +82,7 @@ class ProfileViewModel : ViewModel() {
                     .await()
 
                 _saveResult.value = SaveResult.Success
-                Log.d(TAG, "saveOrUpdateUser: Data uživatele $userId úspěšně uložena.")
+                Log.d(tag, "saveOrUpdateUser: Data uživatele $userId úspěšně uložena.")
 
                 // Aktualizujeme lokální data
                 _userData.value = _userData.value?.copy(
@@ -95,7 +95,7 @@ class ProfileViewModel : ViewModel() {
 
             } catch (e: Exception) {
                 _saveResult.value = SaveResult.Error(e.message ?: "Chyba při ukládání.")
-                Log.e(TAG, "saveOrUpdateUser: Chyba při ukládání dat uživatele $userId.", e)
+                Log.e(tag, "saveOrUpdateUser: Chyba při ukládání dat uživatele $userId.", e)
             }
         }
     }
@@ -103,6 +103,6 @@ class ProfileViewModel : ViewModel() {
     // Reset stavu
     fun resetSaveResult() {
         _saveResult.value = SaveResult.Idle
-        Log.d(TAG,"resetSaveResult: Stav resetován na Idle.")
+        Log.d(tag,"resetSaveResult: Stav resetován na Idle.")
     }
 }

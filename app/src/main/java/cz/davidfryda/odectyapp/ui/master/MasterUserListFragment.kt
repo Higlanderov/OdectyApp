@@ -64,7 +64,7 @@ class MasterUserListFragment : Fragment() {
 
                             Log.d("MasterUserListFragment", "Calling generateImagesZip...")
 
-                            val zipContent = viewModel.generateImagesZip(requireContext())
+                            val zipContent = viewModel.generateImagesZip()
 
                             Log.d("MasterUserListFragment", "ZIP generated, size: ${zipContent.size} bytes")
 
@@ -154,8 +154,11 @@ class MasterUserListFragment : Fragment() {
                         (progress.current * 100) / progress.total
                     } else 0
                     binding.downloadProgressBar.progress = percentage
-                    binding.downloadProgressText.text =
-                        "Stahuji obrázky... (${progress.current}/${progress.total})"
+                    binding.downloadProgressText.text = getString(
+                        R.string.downloading_images_progress,
+                        progress.current,
+                        progress.total
+                    )
                 }
                 is DownloadProgress.Complete -> {
                     binding.downloadProgressCard.isVisible = false
@@ -216,7 +219,7 @@ class MasterUserListFragment : Fragment() {
 
     private fun updateFilterButtonState(isActive: Boolean) {
         if (isActive) {
-            binding.toggleFilterButton.text = "Filtr je Aktivní"
+            binding.toggleFilterButton.text = getString(R.string.filter_is_active)  // ✨ ZMĚNA
             val activeColor = ContextCompat.getColor(requireContext(), R.color.colorPrimary)
             binding.toggleFilterButton.iconTint = ColorStateList.valueOf(activeColor)
         } else {

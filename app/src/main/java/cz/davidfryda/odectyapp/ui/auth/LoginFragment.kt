@@ -1,20 +1,24 @@
 package cz.davidfryda.odectyapp.ui.auth
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.databinding.FragmentLoginBinding
+import kotlinx.coroutines.launch
 
 class LoginFragment : Fragment() {
 
@@ -22,20 +26,7 @@ class LoginFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: AuthViewModel by viewModels()
-
-    // NOVÉ: Připravíme spouštěč pro Google Sign-In
-    private val googleSignInLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            val account = task.getResult(ApiException::class.java)!!
-            // Získáme klíčový ID token a pošleme ho do ViewModelu
-            viewModel.signInWithGoogle(account.idToken!!)
-        } catch (e: ApiException) {
-            Toast.makeText(context, "Přihlášení přes Google selhalo.", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private lateinit var credentialManager: CredentialManager
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -47,6 +38,9 @@ class LoginFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // ✨ NOVÉ: Inicializace Credential Manager
+        credentialManager = CredentialManager.create(requireContext())
 
         binding.registerPromptText.setOnClickListener {
             findNavController().navigate(R.id.action_loginFragment_to_registerFragment)
@@ -63,12 +57,11 @@ class LoginFragment : Fragment() {
             }
         }
 
-        // NOVÉ: Listener pro Google tlačítko
+        // ✨ UPRAVENO: Google Sign-In s Credential Manager
         binding.googleSignInButton.setOnClickListener {
-            launchGoogleSignIn()
+            signInWithGoogle()
         }
 
-        // UPRAVENO: Observer nyní řeší i nové uživatele
         viewModel.authResult.observe(viewLifecycleOwner) { result ->
             binding.progressBar.isVisible = result is AuthResult.Loading
 
@@ -77,13 +70,10 @@ class LoginFragment : Fragment() {
                     Toast.makeText(context, "Přihlášení úspěšné!", Toast.LENGTH_SHORT).show()
 
                     if (result.isNewUser) {
-                        // Nový uživatel (z Google nebo z registrace) musí vyplnit údaje
                         findNavController().navigate(R.id.action_loginFragment_to_userInfoFragment)
                     } else if (result.isMaster) {
-                        // Stávající uživatel a je to správce
                         findNavController().navigate(R.id.action_loginFragment_to_masterUserListFragment)
                     } else {
-                        // Stávající běžný uživatel
                         findNavController().navigate(R.id.action_loginFragment_to_mainFragment)
                     }
                 }
@@ -95,16 +85,54 @@ class LoginFragment : Fragment() {
         }
     }
 
-    // NOVÁ METODA pro spuštění přihlašovacího dialogu
-    private fun launchGoogleSignIn() {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
-            .requestEmail()
+    // ✨ NOVÁ METODA: Google Sign-In s Credential Manager API
+    private fun signInWithGoogle() {
+        val googleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(getString(R.string.default_web_client_id))
             .build()
-        val googleSignInClient = GoogleSignIn.getClient(requireActivity(), gso)
-        // Před spuštěním je dobré se odhlásit, aby si uživatel mohl vždy vybrat účet
-        googleSignInClient.signOut().addOnCompleteListener {
-            googleSignInLauncher.launch(googleSignInClient.signInIntent)
+
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        lifecycleScope.launch {
+            try {
+                val result = credentialManager.getCredential(
+                    request = request,
+                    context = requireContext()
+                )
+
+                val credential = result.credential
+
+                // ✨ OPRAVENO: Správná kontrola typu
+                when (credential) {
+                    is GoogleIdTokenCredential -> {
+                        val idToken = credential.idToken
+                        Log.d("LoginFragment", "Google ID Token received: ${idToken.take(20)}...")
+                        viewModel.signInWithGoogle(idToken)
+                    }
+                    else -> {
+                        // Pokusíme se vytvořit z dat
+                        try {
+                            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                            val idToken = googleIdTokenCredential.idToken
+                            Log.d("LoginFragment", "Google ID Token created from data: ${idToken.take(20)}...")
+                            viewModel.signInWithGoogle(idToken)
+                        } catch (e: Exception) {
+                            Log.e("LoginFragment", "Failed to parse credential", e)
+                            Toast.makeText(context, "Neplatný typ přihlašovacích údajů", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
+            } catch (e: GetCredentialException) {
+                Log.e("LoginFragment", "Error getting credential", e)
+                Toast.makeText(context, "Přihlášení přes Google selhalo: ${e.message}", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Log.e("LoginFragment", "Unexpected error", e)
+                Toast.makeText(context, "Neočekávaná chyba: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 

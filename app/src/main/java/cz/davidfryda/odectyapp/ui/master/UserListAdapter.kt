@@ -30,7 +30,7 @@ class UserListAdapter : ListAdapter<UserWithStatus, UserListAdapter.UserViewHold
 
         fun bind(userWithStatus: UserWithStatus) {
             val user = userWithStatus.user
-            binding.userName.text = "${user.name} ${user.surname}"
+            binding.userName.text = itemView.context.getString(R.string.user_full_name, user.name, user.surname)
             binding.userAddress.text = user.address
 
             // ✨ Zobrazit hvězdičku pro nové uživatele (prvních 48 hodin od vytvoření účtu)

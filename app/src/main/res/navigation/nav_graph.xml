@@ -167,7 +167,6 @@
     <fragment
         android:id="@+id/masterUserDetailFragment"
         android:name="cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragment"
-        android:label="Přehled uživatele"
         tools:layout="@layout/fragment_master_user_detail" >
         <argument
             android:name="userId"

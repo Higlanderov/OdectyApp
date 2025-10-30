@@ -38,7 +38,7 @@ import java.util.Date
 class MeterDetailViewModel : ViewModel() {
     private val db = Firebase.firestore
     private val storage = Firebase.storage
-    private val TAG = "MeterDetailViewModel"
+    private val tag = "MeterDetailViewModel"
 
     private val _uploadResult = MutableLiveData<UploadResult>(UploadResult.Idle)
     val uploadResult: LiveData<UploadResult> = _uploadResult
@@ -72,7 +72,7 @@ class MeterDetailViewModel : ViewModel() {
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshots, error ->
                 if (error != null) {
-                    Log.e(TAG, "initializeForUser: Chyba při načítání online odečtů", error)
+                    Log.e(tag, "initializeForUser: Chyba při načítání online odečtů", error)
                     onlineFlow.value = emptyList()
                     return@addSnapshotListener
                 }
@@ -122,7 +122,7 @@ class MeterDetailViewModel : ViewModel() {
                     forceSaveReading(userId, meterId, photoUri, manualValue, context)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Chyba při validaci.", e)
+                Log.e(tag, "Chyba při validaci.", e)
                 _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při validaci.")
             }
         }
@@ -150,9 +150,9 @@ class MeterDetailViewModel : ViewModel() {
                 )
                 db.collection("readings").add(readingData).await()
                 _uploadResult.value = UploadResult.Success
-                Log.d(TAG, "saveReadingOnline: Odečet úspěšně nahrán.")
+                Log.d(tag, "saveReadingOnline: Odečet úspěšně nahrán.")
             } catch (e: Exception) {
-                Log.e(TAG, "Chyba při nahrávání online.", e)
+                Log.e(tag, "Chyba při nahrávání online.", e)
                 _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při nahrávání.")
             }
         }
@@ -166,13 +166,13 @@ class MeterDetailViewModel : ViewModel() {
                 val outputStream = FileOutputStream(localFile)
                 inputStream?.copyTo(outputStream)
                 inputStream?.close(); outputStream.close()
-                Log.d(TAG, "saveReadingOffline: Fotografie uložena lokálně: ${localFile.absolutePath}")
+                Log.d(tag, "saveReadingOffline: Fotografie uložena lokálně: ${localFile.absolutePath}")
 
                 val offlineReading = OfflineReading(userId = userId, meterId = meterId,
                     localPhotoPath = localFile.absolutePath, finalValue = manualValue)
                 val dao = AppDatabase.getDatabase(context).readingDao()
                 val newId = dao.insert(offlineReading)
-                Log.d(TAG, "saveReadingOffline: Záznam vložen do Room s ID: $newId")
+                Log.d(tag, "saveReadingOffline: Záznam vložen do Room s ID: $newId")
 
                 val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 val uploadWorkRequest = OneTimeWorkRequestBuilder<UploadWorker>()
@@ -180,11 +180,11 @@ class MeterDetailViewModel : ViewModel() {
                     .setInputData(workDataOf("offline_reading_id" to newId))
                     .build()
                 WorkManager.getInstance(context).enqueue(uploadWorkRequest)
-                Log.d(TAG, "saveReadingOffline: WorkManager naplánován pro ID: $newId")
+                Log.d(tag, "saveReadingOffline: WorkManager naplánován pro ID: $newId")
 
                 _uploadResult.postValue(UploadResult.Success)
             } catch (e: Exception) {
-                Log.e(TAG, "Chyba při ukládání pro offline použití.", e)
+                Log.e(tag, "Chyba při ukládání pro offline použití.", e)
                 _uploadResult.postValue(UploadResult.Error(e.message ?: "Chyba při ukládání pro offline použití."))
             }
         }
@@ -210,20 +210,20 @@ class MeterDetailViewModel : ViewModel() {
                 }
             }
             .addOnFailureListener { e ->
-                Log.e(TAG, "loadMeterDetails: Chyba při načítání detailu měřáku $meterId", e)
+                Log.e(tag, "loadMeterDetails: Chyba při načítání detailu měřáku $meterId", e)
             }
     }
 
     fun loadSingleReading(readingId: String) {
         if (readingId.startsWith("offline_")) {
-            Log.w(TAG, "loadSingleReading: Pokus o načtení detailu pro offline záznam $readingId - není implementováno.")
+            Log.w(tag, "loadSingleReading: Pokus o načtení detailu pro offline záznam $readingId - není implementováno.")
             _singleReading.value = Reading(id=readingId, isSynced = false)
             return
         }
         db.collection("readings").document(readingId)
             .addSnapshotListener { document, error ->
                 if (error != null) {
-                    Log.e(TAG, "loadSingleReading: Chyba při načítání odečtu $readingId", error)
+                    Log.e(tag, "loadSingleReading: Chyba při načítání odečtu $readingId", error)
                     _singleReading.value = null
                     return@addSnapshotListener
                 }
@@ -231,7 +231,7 @@ class MeterDetailViewModel : ViewModel() {
                     _singleReading.value = it.copy(id = document.id, isSynced = true)
                 } ?: run {
                     _singleReading.value = null
-                    Log.w(TAG, "loadSingleReading: Dokument odečtu $readingId nenalezen.")
+                    Log.w(tag, "loadSingleReading: Dokument odečtu $readingId nenalezen.")
                 }
             }
     }
@@ -239,7 +239,7 @@ class MeterDetailViewModel : ViewModel() {
     fun updateReadingValue(readingId: String, newValue: Double, asMaster: Boolean) {
         viewModelScope.launch {
             if (readingId.startsWith("offline_")) {
-                Log.e(TAG, "updateReadingValue: Nelze upravit offline záznam $readingId.")
+                Log.e(tag, "updateReadingValue: Nelze upravit offline záznam $readingId.")
                 _updateResult.value = UploadResult.Error("Nelze upravit offline záznam.")
                 return@launch
             }
@@ -253,9 +253,9 @@ class MeterDetailViewModel : ViewModel() {
                     .update(updateMap)
                     .await()
                 _updateResult.value = UploadResult.Success
-                Log.d(TAG, "updateReadingValue: Hodnota odečtu $readingId aktualizována.")
+                Log.d(tag, "updateReadingValue: Hodnota odečtu $readingId aktualizována.")
             } catch (e: Exception) {
-                Log.e(TAG, "Chyba při aktualizaci hodnoty odečtu $readingId.", e)
+                Log.e(tag, "Chyba při aktualizaci hodnoty odečtu $readingId.", e)
                 _updateResult.value = UploadResult.Error(e.message ?: "Chyba při aktualizaci.")
             }
         }
@@ -264,9 +264,9 @@ class MeterDetailViewModel : ViewModel() {
     // ZMĚNĚNO: Varianta 2 - fotka se smaže PŘED dokumentem
     fun deleteReading(readingId: String, photoUrl: String?, context: Context) {
         viewModelScope.launch {
-            Log.d(TAG, "=== deleteReading called ===")
-            Log.d(TAG, "readingId: $readingId")
-            Log.d(TAG, "photoUrl: '$photoUrl'")
+            Log.d(tag, "=== deleteReading called ===")
+            Log.d(tag, "readingId: $readingId")
+            Log.d(tag, "photoUrl: '$photoUrl'")
 
             // Kontrola offline ID
             if (readingId.startsWith("offline_")) {
@@ -281,19 +281,19 @@ class MeterDetailViewModel : ViewModel() {
                             withContext(Dispatchers.IO) {
                                 try {
                                     File(path).delete()
-                                    Log.d(TAG, "deleteReading: Lokální fotka smazána: $path")
+                                    Log.d(tag, "deleteReading: Lokální fotka smazána: $path")
                                 } catch (e: Exception) {
-                                    Log.e(TAG, "deleteReading: Chyba při mazání lokální fotky $path", e)
+                                    Log.e(tag, "deleteReading: Chyba při mazání lokální fotky $path", e)
                                 }
                             }
                         }
-                        Log.d(TAG, "deleteReading: Offline odečet $readingId smazán z Room.")
+                        Log.d(tag, "deleteReading: Offline odečet $readingId smazán z Room.")
                         _deleteResult.value = UploadResult.Success
                     } else {
                         throw IllegalArgumentException("Neplatné offline ID: $readingId")
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Chyba při mazání offline odečtu $readingId.", e)
+                    Log.e(tag, "Chyba při mazání offline odečtu $readingId.", e)
                     _deleteResult.value = UploadResult.Error(e.message ?: "Chyba při mazání offline odečtu.")
                 }
                 return@launch
@@ -304,32 +304,32 @@ class MeterDetailViewModel : ViewModel() {
             try {
                 // 1. NEJDŘÍV smazat fotku ze Storage (pokud existuje URL)
                 if (!photoUrl.isNullOrEmpty()) {
-                    Log.d(TAG, "deleteReading: Začínám mazat fotku ze Storage...")
+                    Log.d(tag, "deleteReading: Začínám mazat fotku ze Storage...")
                     withContext(Dispatchers.IO) {
                         try {
                             val photoRef = storage.getReferenceFromUrl(photoUrl)
-                            Log.d(TAG, "deleteReading: Storage path: ${photoRef.path}")
+                            Log.d(tag, "deleteReading: Storage path: ${photoRef.path}")
 
                             photoRef.delete().await()
-                            Log.d(TAG, "deleteReading: ✅ Fotka ÚSPĚŠNĚ smazána ze Storage.")
+                            Log.d(tag, "deleteReading: ✅ Fotka ÚSPĚŠNĚ smazána ze Storage.")
                         } catch (e: Exception) {
-                            Log.e(TAG, "deleteReading: ❌ CHYBA při mazání fotky ze Storage", e)
+                            Log.e(tag, "deleteReading: ❌ CHYBA při mazání fotky ze Storage", e)
                             // Pokračujeme i při chybě, abychom mohli smazat alespoň dokument
                         }
                     }
                 } else {
-                    Log.w(TAG, "deleteReading: photoUrl je NULL nebo prázdné")
+                    Log.w(tag, "deleteReading: photoUrl je NULL nebo prázdné")
                 }
 
                 // 2. TEPRVE PAK smazat dokument z Firestore
-                Log.d(TAG, "deleteReading: Mazání dokumentu z Firestore...")
+                Log.d(tag, "deleteReading: Mazání dokumentu z Firestore...")
                 db.collection("readings").document(readingId).delete().await()
-                Log.d(TAG, "deleteReading: Odečet $readingId smazán z Firestore.")
+                Log.d(tag, "deleteReading: Odečet $readingId smazán z Firestore.")
 
                 _deleteResult.value = UploadResult.Success
 
             } catch (e: Exception) {
-                Log.e(TAG, "deleteReading: Chyba při mazání odečtu $readingId.", e)
+                Log.e(tag, "deleteReading: Chyba při mazání odečtu $readingId.", e)
                 _deleteResult.value = UploadResult.Error(e.message ?: "Chyba při mazání odečtu.")
             }
         }
@@ -337,22 +337,22 @@ class MeterDetailViewModel : ViewModel() {
 
     fun resetDeleteResult() {
         _deleteResult.value = UploadResult.Idle
-        Log.d(TAG,"resetDeleteResult: Stav resetován na Idle.")
+        Log.d(tag,"resetDeleteResult: Stav resetován na Idle.")
     }
 
     fun resetUpdateResult() {
         _updateResult.value = UploadResult.Idle
-        Log.d(TAG,"resetUpdateResult: Stav resetován na Idle.")
+        Log.d(tag,"resetUpdateResult: Stav resetován na Idle.")
     }
 
     fun resetUploadResult() {
         _uploadResult.value = UploadResult.Idle
         _validationResult.value = ValidationResult.Valid
-        Log.d(TAG,"resetUploadResult: Stav resetován na Idle.")
+        Log.d(tag,"resetUploadResult: Stav resetován na Idle.")
     }
     // Funkce pro resetování stavu validace
     fun resetValidationResult() {
         _validationResult.value = ValidationResult.Valid
-        Log.d(TAG, "resetValidationResult: Stav resetován na Valid.")
+        Log.d(tag, "resetValidationResult: Stav resetován na Valid.")
     }
 }

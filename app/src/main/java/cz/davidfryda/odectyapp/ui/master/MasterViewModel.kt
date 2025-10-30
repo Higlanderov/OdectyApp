@@ -16,7 +16,6 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import android.content.Context
 import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -26,10 +25,8 @@ import java.util.zip.ZipOutputStream
 
 enum class ReadingStatusFilter { DONE, PENDING, ALL }
 
-// ✨ NOVÝ: Enum pro filtr zablokování
 enum class BlockedFilter { ALL, ACTIVE, BLOCKED }
 
-// Sealed class pro stavy stahování
 sealed class DownloadProgress {
     object Idle : DownloadProgress()
     data class Downloading(val current: Int, val total: Int) : DownloadProgress()
@@ -40,7 +37,7 @@ sealed class DownloadProgress {
 class MasterViewModel : ViewModel() {
     private val db = Firebase.firestore
     private val storage = Firebase.storage
-    private val TAG = "MasterViewModel"
+    private val tag = "MasterViewModel"
 
     private var allUsers = mapOf<String, UserData>()
     private var allMeters = mapOf<String, Meter>()
@@ -49,7 +46,7 @@ class MasterViewModel : ViewModel() {
     private val _filteredUsersWithStatus = MutableLiveData<List<UserWithStatus>>()
     val filteredUsersWithStatus: LiveData<List<UserWithStatus>> = _filteredUsersWithStatus
 
-    private val _isFilterActive = MutableLiveData<Boolean>(false)
+    private val _isFilterActive = MutableLiveData(false)
     val isFilterActive: LiveData<Boolean> = _isFilterActive
 
     private val _downloadProgress = MutableLiveData<DownloadProgress>(DownloadProgress.Idle)
@@ -60,50 +57,52 @@ class MasterViewModel : ViewModel() {
     private var currentStatusFilter = ReadingStatusFilter.ALL
     private var currentMonthFilter = Calendar.getInstance().get(Calendar.MONTH)
     private var currentYearFilter = Calendar.getInstance().get(Calendar.YEAR)
-    // ✨ NOVÉ: Proměnná pro filtr zablokování
     private var currentBlockedFilter = BlockedFilter.ALL
 
     init {
-        Log.d(TAG, "Initializing MasterViewModel")
+        Log.d(tag, "Initializing MasterViewModel")
         db.collection("users").addSnapshotListener { usersSnapshot, error ->
             if (error != null) {
-                Log.e(TAG, "Error fetching users", error)
+                Log.e(tag, "Error fetching users", error)
                 return@addSnapshotListener
             }
-            usersSnapshot?.let {
-                allUsers = it.documents.mapNotNull { doc -> doc.toObject(UserData::class.java)?.copy(uid = doc.id) }.associateBy { it.uid }
-                Log.d(TAG, "Fetched ${allUsers.size} users")
+            usersSnapshot?.let { snapshot ->  // ✨ ZMĚNA: it → snapshot
+                allUsers = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(UserData::class.java)?.copy(uid = doc.id)
+                }.associateBy { it.uid }
+                Log.d(tag, "Fetched ${allUsers.size} users")
                 applyFilter()
             }
         }
         db.collectionGroup("meters").addSnapshotListener { metersSnapshot, error ->
             if (error != null) {
-                Log.e(TAG, "Error fetching meters", error)
+                Log.e(tag, "Error fetching meters", error)
                 return@addSnapshotListener
             }
-            metersSnapshot?.let {
-                allMeters = it.documents.mapNotNull { doc ->
+            metersSnapshot?.let { snapshot ->  // ✨ ZMĚNA: it → snapshot
+                allMeters = snapshot.documents.mapNotNull { doc ->
                     val meter = doc.toObject(Meter::class.java)?.copy(id = doc.id)
                     meter
                 }.associateBy { it.id }
-                Log.d(TAG, "Fetched ${allMeters.size} meters")
+                Log.d(tag, "Fetched ${allMeters.size} meters")
                 applyFilter()
             }
         }
         db.collection("readings").addSnapshotListener { readingsSnapshot, error ->
             if (error != null) {
-                Log.e(TAG, "Error fetching readings", error)
+                Log.e(tag, "Error fetching readings", error)
                 return@addSnapshotListener
             }
-            readingsSnapshot?.let {
-                allReadings = it.documents.mapNotNull { doc -> doc.toObject(Reading::class.java)?.copy(id = doc.id) }
-                Log.d(TAG, "Fetched ${allReadings.size} readings")
+            readingsSnapshot?.let { snapshot ->  // ✨ ZMĚNA: it → snapshot
+                allReadings = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Reading::class.java)?.copy(id = doc.id)
+                }
+                Log.d(tag, "Fetched ${allReadings.size} readings")
                 applyFilter()
             }
         }
     }
 
-    // ✨ UPRAVENO: Přidán parametr blockedFilter
     fun applyFilter(
         searchText: String? = null,
         status: ReadingStatusFilter? = null,
@@ -117,9 +116,8 @@ class MasterViewModel : ViewModel() {
         year?.let { currentYearFilter = it }
         blockedFilter?.let { currentBlockedFilter = it }
 
-        Log.d(TAG, "Applying filter: Search='$currentSearchText', Status=$currentStatusFilter, Month=$currentMonthFilter, Year=$currentYearFilter, Blocked=$currentBlockedFilter")
+        Log.d(tag, "Applying filter: Search='$currentSearchText', Status=$currentStatusFilter, Month=$currentMonthFilter, Year=$currentYearFilter, Blocked=$currentBlockedFilter")
 
-        // 1. Filtrování uživatelů podle textu
         val filteredUserIds = if (currentSearchText.isNotBlank()) {
             allUsers.values.filter { user ->
                 user.name.contains(currentSearchText, true) ||
@@ -129,9 +127,8 @@ class MasterViewModel : ViewModel() {
         } else {
             allUsers.keys
         }
-        Log.d(TAG, "Filtered users by text count: ${filteredUserIds.size}")
+        Log.d(tag, "Filtered users by text count: ${filteredUserIds.size}")
 
-        // ✨ 1b. Filtrování podle stavu zablokování
         val filteredByBlocked = when (currentBlockedFilter) {
             BlockedFilter.ALL -> filteredUserIds
             BlockedFilter.ACTIVE -> filteredUserIds.filter { uid ->
@@ -141,9 +138,8 @@ class MasterViewModel : ViewModel() {
                 allUsers[uid]?.isDisabled == true
             }.toSet()
         }
-        Log.d(TAG, "Filtered users by blocked status count: ${filteredByBlocked.size}")
+        Log.d(tag, "Filtered users by blocked status count: ${filteredByBlocked.size}")
 
-        // 2. Příprava seznamu uživatelů pro UI
         val calendar = Calendar.getInstance()
         val usersWithStatus = allUsers.values
             .filter { it.uid in filteredByBlocked }
@@ -157,16 +153,14 @@ class MasterViewModel : ViewModel() {
                 UserWithStatus(user, hasReading)
             }
 
-        // 3. Aplikace filtru statusu na seznam pro UI
         val uiFinalList = when (currentStatusFilter) {
             ReadingStatusFilter.DONE -> usersWithStatus.filter { it.hasReadingForCurrentMonth }
             ReadingStatusFilter.PENDING -> usersWithStatus.filter { !it.hasReadingForCurrentMonth }
             ReadingStatusFilter.ALL -> usersWithStatus
         }
         _filteredUsersWithStatus.value = uiFinalList.sortedBy { it.user.surname }
-        Log.d(TAG, "UI list size after status filter: ${uiFinalList.size}")
+        Log.d(tag, "UI list size after status filter: ${uiFinalList.size}")
 
-        // 4. Sestavení dat pro export
         val newExportableData = mutableListOf<FullReadingData>()
         val finalFilteredUserIdsForExport = uiFinalList.map { it.user.uid }.toSet()
 
@@ -182,13 +176,13 @@ class MasterViewModel : ViewModel() {
                 if (user != null && meter != null) {
                     newExportableData.add(FullReadingData(user, meter, reading))
                 } else {
-                    Log.w(TAG, "Skipping reading ${reading.id} for export: User or Meter not found")
+                    Log.w(tag, "Skipping reading ${reading.id} for export: User or Meter not found")
                 }
             }
         }
 
         exportableData = newExportableData.sortedWith(compareBy({ it.user.surname }, { it.reading?.timestamp }))
-        Log.d(TAG, "Exportable data size: ${exportableData.size}")
+        Log.d(tag, "Exportable data size: ${exportableData.size}")
 
         updateFilterActiveStatus()
     }
@@ -200,23 +194,23 @@ class MasterViewModel : ViewModel() {
                 currentStatusFilter != ReadingStatusFilter.ALL ||
                 currentMonthFilter != defaultMonth ||
                 currentYearFilter != defaultYear ||
-                currentBlockedFilter != BlockedFilter.ALL  // ✨ Přidáno
+                currentBlockedFilter != BlockedFilter.ALL
         _isFilterActive.value = isActive
-        Log.d(TAG, "Filter active status updated: $isActive")
+        Log.d(tag, "Filter active status updated: $isActive")
     }
 
     fun resetFilter() {
-        Log.d(TAG, "Resetting filter")
+        Log.d(tag, "Resetting filter")
         currentSearchText = ""
         currentStatusFilter = ReadingStatusFilter.ALL
         currentMonthFilter = Calendar.getInstance().get(Calendar.MONTH)
         currentYearFilter = Calendar.getInstance().get(Calendar.YEAR)
-        currentBlockedFilter = BlockedFilter.ALL  // ✨ Přidáno
+        currentBlockedFilter = BlockedFilter.ALL
         applyFilter()
     }
 
     fun generateCsvContent(): String {
-        Log.d(TAG, "Generating CSV content for ${exportableData.size} records")
+        Log.d(tag, "Generating CSV content for ${exportableData.size} records")
         val header = "Datum Odečtu,Jméno,Příjmení,Adresa,Měřák ID,Název Měřáku,Typ Měřáku,Popis Správce,Hodnota Odečtu,Jednotka\n"
         val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
         val rows = exportableData.joinToString(separator = "\n") { data ->
@@ -235,7 +229,7 @@ class MasterViewModel : ViewModel() {
     }
 
     fun generateXlsxContent(): ByteArray {
-        Log.d(TAG, "Generating XLSX content for ${exportableData.size} records")
+        Log.d(tag, "Generating XLSX content for ${exportableData.size} records")
         val workbook = XSSFWorkbook()
         val sheet = workbook.createSheet("Odečty")
         val headerRow = sheet.createRow(0)
@@ -279,9 +273,10 @@ class MasterViewModel : ViewModel() {
         }
     }
 
-    suspend fun generateImagesZip(context: Context): ByteArray = withContext(Dispatchers.IO) {
-        Log.d(TAG, "=== Starting generateImagesZip ===")
-        Log.d(TAG, "Total exportableData records: ${exportableData.size}")
+    // ✨ ZMĚNA 1: Odebrán nepoužitý parametr context
+    suspend fun generateImagesZip(): ByteArray = withContext(Dispatchers.IO) {
+        Log.d(tag, "=== Starting generateImagesZip ===")
+        Log.d(tag, "Total exportableData records: ${exportableData.size}")
 
         val byteArrayOutputStream = ByteArrayOutputStream()
         val zipOutputStream = ZipOutputStream(byteArrayOutputStream)
@@ -291,7 +286,7 @@ class MasterViewModel : ViewModel() {
             val recordsWithImages = exportableData.filter { !it.reading?.photoUrl.isNullOrEmpty() }
             val totalImages = recordsWithImages.size
 
-            Log.d(TAG, "Records with images: $totalImages")
+            Log.d(tag, "Records with images: $totalImages")
 
             withContext(Dispatchers.Main) {
                 _downloadProgress.value = DownloadProgress.Downloading(0, totalImages)
@@ -304,20 +299,20 @@ class MasterViewModel : ViewModel() {
                 val reading = data.reading
                 val photoUrl = reading?.photoUrl
 
-                Log.d(TAG, "Processing record ${index + 1}/${exportableData.size}")
+                Log.d(tag, "Processing record ${index + 1}/${exportableData.size}")
 
                 if (photoUrl.isNullOrEmpty()) {
-                    Log.d(TAG, "  -> SKIPPED: No photo URL")
+                    Log.d(tag, "  -> SKIPPED: No photo URL")
                     skippedCount++
                     continue
                 }
 
                 try {
-                    Log.d(TAG, "  -> Downloading ${processedCount + 1}/$totalImages")
+                    Log.d(tag, "  -> Downloading ${processedCount + 1}/$totalImages")
 
                     val photoRef = storage.getReferenceFromUrl(photoUrl)
                     val imageBytes = photoRef.getBytes(Long.MAX_VALUE).await()
-                    Log.d(TAG, "  -> Downloaded ${imageBytes.size} bytes")
+                    Log.d(tag, "  -> Downloaded ${imageBytes.size} bytes")
 
                     val address = data.user.address.replace("[^a-zA-Z0-9]".toRegex(), "_")
                     val timestamp = reading.timestamp?.let { dateFormat.format(it) } ?: "bez_data"
@@ -329,29 +324,29 @@ class MasterViewModel : ViewModel() {
                     zipOutputStream.closeEntry()
 
                     processedCount++
-                    Log.d(TAG, "  -> SUCCESS ($processedCount/$totalImages)")
+                    Log.d(tag, "  -> SUCCESS ($processedCount/$totalImages)")
 
                     withContext(Dispatchers.Main) {
                         _downloadProgress.value = DownloadProgress.Downloading(processedCount, totalImages)
                     }
 
                 } catch (e: Exception) {
-                    Log.e(TAG, "  -> FAILED to download image", e)
+                    Log.e(tag, "  -> FAILED to download image", e)
                     skippedCount++
                 }
             }
 
-            Log.d(TAG, "=== ZIP generation complete ===")
-            Log.d(TAG, "Processed: $processedCount")
-            Log.d(TAG, "Skipped: $skippedCount")
-            Log.d(TAG, "ZIP size: ${byteArrayOutputStream.size()} bytes")
+            Log.d(tag, "=== ZIP generation complete ===")
+            Log.d(tag, "Processed: $processedCount")
+            Log.d(tag, "Skipped: $skippedCount")
+            Log.d(tag, "ZIP size: ${byteArrayOutputStream.size()} bytes")
 
             withContext(Dispatchers.Main) {
                 _downloadProgress.value = DownloadProgress.Complete
             }
 
         } catch (e: Exception) {
-            Log.e(TAG, "Fatal error in generateImagesZip", e)
+            Log.e(tag, "Fatal error in generateImagesZip", e)
 
             withContext(Dispatchers.Main) {
                 _downloadProgress.value = DownloadProgress.Error(e.message ?: "Neznámá chyba")
@@ -367,6 +362,6 @@ class MasterViewModel : ViewModel() {
 
     fun resetDownloadProgress() {
         _downloadProgress.value = DownloadProgress.Idle
-        Log.d(TAG, "Download progress reset to Idle")
+        Log.d(tag, "Download progress reset to Idle")
     }
 }

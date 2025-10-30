@@ -12,13 +12,13 @@
         android:layout_height="200dp"
         android:scaleType="centerCrop"
         android:layout_marginBottom="16dp"
-        android:contentDescription="Náhled pořízené fotografie"/>
+        android:contentDescription="@string/manual_reading_photo_preview_description"/>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:helperText="Pro desetinná místa (červená čísla) použijte tečku '.'"
-        android:hint="Zadejte hodnotu z měřáku">
+        app:helperText="@string/manual_reading_helper_text"
+        android:hint="@string/manual_reading_value_hint">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/dialogValueEditText"
@@ -39,14 +39,14 @@
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Zrušit" />
+            android:text="@string/cancel" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/dialogSaveButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="Uložit" />
+            android:text="@string/save" />
 
     </LinearLayout>
 

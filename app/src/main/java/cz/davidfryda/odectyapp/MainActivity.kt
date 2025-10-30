@@ -46,7 +46,6 @@ import cz.davidfryda.odectyapp.data.UserData
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import cz.davidfryda.odectyapp.workers.NotificationWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,12 +74,46 @@ class MainActivity : AppCompatActivity() {
 
     private val tag = "MainActivity"
 
-    // ✨ NOVÉ: Listener pro změny auth stavu
     private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
         val user = firebaseAuth.currentUser
         if (user == null) {
-            Log.d(tag, "User logged out (possibly blocked), navigating to login")
-            navigateToLogin()
+            val currentDestination = navController.currentDestination?.id
+            val authScreens = setOf(
+                R.id.loginFragment,
+                R.id.registerFragment,
+                R.id.splashFragment
+            )
+
+            if (currentDestination != null && currentDestination !in authScreens) {
+                Log.d(tag, "User logged out, navigating to login")
+                handleUserLogout(showBlockedMessage = false)
+            }
+        } else {
+            user.getIdToken(true).addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    Log.e(tag, "Token refresh failed - possibly blocked: ${task.exception?.message}")
+                    auth.signOut()
+                    handleUserLogout(showBlockedMessage = true)
+                }
+            }
+        }
+    }
+
+    private fun handleUserLogout(showBlockedMessage: Boolean) {
+        runOnUiThread {
+            if (navController.currentDestination?.id != R.id.loginFragment) {
+                val navOptions = NavOptions.Builder()
+                    .setPopUpTo(navController.graph.findStartDestination().id, true, saveState = false)
+                    .build()
+                try {
+                    navController.navigate(R.id.loginFragment, null, navOptions)
+                    if (showBlockedMessage) {
+                        Toast.makeText(this, "Váš účet byl zablokován", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Chyba při navigaci na login", e)
+                }
+            }
         }
     }
 
@@ -107,7 +140,6 @@ class MainActivity : AppCompatActivity() {
             Log.d(tag, "Výběr obrázku zrušen.")
         }
     }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -157,6 +189,21 @@ class MainActivity : AppCompatActivity() {
             Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
             updateToolbarMenuVisibility(destination)
 
+            // ✨ Pouze masterUserDetailFragment má vlastní title management
+            val fragmentsWithCustomTitle = setOf(
+                R.id.masterUserDetailFragment  // ✨ Jen tento!
+                // userDetailFragment NENÍ v seznamu - použije label z nav_graph
+            )
+
+            if (destination.id in fragmentsWithCustomTitle) {
+                Log.d(tag, "Fragment ${destination.id} si nastaví title sám - MainActivity ho nepřepisuje")
+            } else {
+                destination.label?.toString()?.let {
+                    supportActionBar?.title = it
+                    Log.d(tag, "MainActivity nastavilo title: $it")
+                }
+            }
+
             val currentDestinations = setOf(R.id.mainFragment, R.id.masterUserListFragment)
             if (destination.id in currentDestinations) {
                 updateNavHeader(navView)
@@ -166,25 +213,7 @@ class MainActivity : AppCompatActivity() {
 
         scheduleNotificationWorker()
 
-        // ✨ NOVÉ: Přidat listener pro detekci změn auth stavu
         auth.addAuthStateListener(authStateListener)
-    }
-
-    // ✨ NOVÉ: Funkce pro navigaci na login
-    private fun navigateToLogin() {
-        runOnUiThread {
-            if (navController.currentDestination?.id != R.id.loginFragment) {
-                val navOptions = NavOptions.Builder()
-                    .setPopUpTo(navController.graph.findStartDestination().id, true, saveState = false)
-                    .build()
-                try {
-                    navController.navigate(R.id.loginFragment, null, navOptions)
-                    Toast.makeText(this, "Váš účet byl zablokován", Toast.LENGTH_LONG).show()
-                } catch (e: Exception) {
-                    Log.e(tag, "Chyba při navigaci na login po zablokování", e)
-                }
-            }
-        }
     }
 
     private fun copyImageToInternalStorage(userId: String, sourceUri: Uri): String? {
@@ -258,7 +287,6 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unreadListener?.remove()
-        // ✨ NOVÉ: Odebrat listener při zničení aktivity
         auth.removeAuthStateListener(authStateListener)
         Log.d(tag, "onDestroy: Listener notifikací a auth odpojen.")
     }
@@ -274,7 +302,7 @@ class MainActivity : AppCompatActivity() {
     private fun listenForUnreadNotifications(masterUserId: String) {
         Log.d(tag, "Spouštím listener pro notifikace mastera ID: $masterUserId")
         if (unreadListener != null) {
-            Log.d(tag, "Listener notifikací již běží, přepisuji.");
+            Log.d(tag, "Listener notifikací již běží, přepisuji.")
             unreadListener?.remove()
         }
 
@@ -535,7 +563,7 @@ class MainActivity : AppCompatActivity() {
 
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.change_profile_picture_title)
-            .setItems(options) { dialog, which ->
+            .setItems(options) { _, which ->
                 when (which) {
                     0 -> {
                         Log.d(tag, "Volba: Změnit obrázek.")

@@ -11,7 +11,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -67,7 +66,9 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         binding.mapView.onCreate(savedInstanceState)
         binding.mapView.getMapAsync(this)
 
-        (activity as? AppCompatActivity)?.supportActionBar?.title = getString(R.string.user_detail_title)
+        // ✨ NOVÉ: Nastavit default title okamžitě
+        activity?.title = getString(R.string.user_detail_title_default)
+        Log.d(tag, "Default title set in onViewCreated")
 
         viewModel.loadUserDetails(args.userId)
         setupObservers()
@@ -82,7 +83,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             showBlockConfirmationDialog()
         }
 
-        // NOVÉ: Listener pro tlačítko smazat uživatele
         binding.deleteUserButton.setOnClickListener {
             showDeleteConfirmationDialog()
         }
@@ -112,7 +112,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             .show()
     }
 
-    // NOVÁ FUNKCE: Dialog pro potvrzení smazání uživatele
     private fun showDeleteConfirmationDialog() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.delete_user_confirm_title)
@@ -127,7 +126,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
     private fun setupObservers() {
 
-        // Listener pro obnovení dat po editaci
         findNavController().currentBackStackEntry?.savedStateHandle?.getLiveData<Boolean>("refresh_data")
             ?.observe(viewLifecycleOwner) { shouldRefresh ->
                 if (shouldRefresh == true) {
@@ -162,7 +160,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             binding.lastReadingValue.visibility = contentVisibility
             binding.editDetailsButton.visibility = contentVisibility
             binding.blockUserButton.visibility = contentVisibility
-            binding.deleteUserButton.visibility = contentVisibility // NOVÉ
+            binding.deleteUserButton.visibility = contentVisibility
 
             if (isInitialLoading) {
                 binding.noteGroup.visibility = View.GONE
@@ -171,7 +169,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
             binding.editDetailsButton.isEnabled = !isLoading
             binding.blockUserButton.isEnabled = !isLoading
-            binding.deleteUserButton.isEnabled = !isLoading // NOVÉ
+            binding.deleteUserButton.isEnabled = !isLoading
             Log.d(tag, "Buttons enabled = ${!isLoading}")
         }
 
@@ -179,6 +177,10 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             Log.d(tag, "Observer userData triggered. User: $user")
             val notAvailable = getString(R.string.not_available)
             if (user != null) {
+                val fullName = "${user.name} ${user.surname}".trim()
+                activity?.title = getString(R.string.user_detail_title_with_name, fullName)
+                Log.d(tag, "Title bar updated with user name: $fullName")
+
                 binding.userNameValue.text = getString(R.string.user_full_name, user.name, user.surname)
                 binding.userAddressValue.text = user.address
                 binding.userUidValue.text = user.uid
@@ -212,6 +214,8 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
             } else {
                 Log.d(tag, "User data is null.")
+                activity?.title = getString(R.string.user_detail_title_default)
+
                 binding.userNameValue.text = notAvailable
                 binding.userAddressValue.text = notAvailable
                 binding.userUidValue.text = notAvailable
@@ -264,7 +268,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             }
         }
 
-        // NOVÝ OBSERVER: Sledování výsledku smazání uživatele
         viewModel.deleteUserResult.observe(viewLifecycleOwner) { result ->
             Log.d(tag, "Observer deleteUserResult triggered. Result: $result")
             when (result) {
@@ -272,7 +275,6 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                     Log.d(tag, "Delete operation successful.")
                     Toast.makeText(context, getString(R.string.user_deleted_successfully), Toast.LENGTH_SHORT).show()
                     viewModel.doneHandlingDeleteResult()
-                    // Navigace zpět na seznam uživatelů
                     findNavController().popBackStack()
                 }
                 is SaveResult.Error -> {
@@ -388,7 +390,21 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    override fun onResume() { super.onResume(); _binding?.mapView?.onResume() }
+    override fun onResume() {
+        super.onResume()
+        _binding?.mapView?.onResume()
+
+        // ✨ OPRAVENO: Použít userData místo userName
+        viewModel.userData.value?.let { user ->
+            val fullName = "${user.name} ${user.surname}".trim()
+            activity?.title = getString(R.string.user_detail_title_with_name, fullName)
+            Log.d(tag, "onResume: Title set to: $fullName")
+        } ?: run {
+            activity?.title = getString(R.string.user_detail_title_default)
+            Log.d(tag, "onResume: Title set to default")
+        }
+    }
+
     override fun onStart() { super.onStart(); _binding?.mapView?.onStart() }
     override fun onStop() { super.onStop(); _binding?.mapView?.onStop() }
     override fun onPause() { super.onPause(); _binding?.mapView?.onPause() }

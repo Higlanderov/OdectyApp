@@ -19,7 +19,6 @@ class AuthViewModel : ViewModel() {
     private val _authResult = MutableLiveData<AuthResult>()
     val authResult: LiveData<AuthResult> = _authResult
 
-    // NOVÁ FUNKCE pro přihlášení přes Google
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
             _authResult.value = AuthResult.Loading
@@ -29,10 +28,8 @@ class AuthViewModel : ViewModel() {
                 val user = authResult.user
 
                 if (user != null) {
-                    // Zjistíme, jestli je to úplně nový uživatel
                     val isNewUser = authResult.additionalUserInfo?.isNewUser ?: false
 
-                    // ✨ NOVÉ: Pokud je to nový uživatel, vytvoříme mu dokument s createdAt
                     if (isNewUser) {
                         val userData = hashMapOf(
                             "uid" to user.uid,
@@ -45,16 +42,19 @@ class AuthViewModel : ViewModel() {
                             "fcmToken" to "",
                             "role" to "user",
                             "isDisabled" to false,
-                            "createdAt" to FieldValue.serverTimestamp() // ✨ Přidáno
+                            "createdAt" to FieldValue.serverTimestamp()
                         )
                         db.collection("users").document(user.uid).set(userData).await()
                     }
 
-                    // Zkontrolujeme roli v databázi
                     val userDoc = db.collection("users").document(user.uid).get().await()
                     val isMaster = userDoc.getString("role") == "master"
 
-                    _authResult.value = AuthResult.Success(user, isMaster, isNewUser)
+                    _authResult.value = AuthResult.Success(
+                        user = user,
+                        isMaster = isMaster,
+                        isNewUser = isNewUser  // ✨ ZMĚNA: Pojmenovaný parametr
+                    )
                 } else {
                     throw IllegalStateException("Uživatel nebyl po přihlášení nalezen.")
                 }
@@ -73,7 +73,11 @@ class AuthViewModel : ViewModel() {
                 if (user != null) {
                     val userDoc = db.collection("users").document(user.uid).get().await()
                     val isMaster = userDoc.getString("role") == "master"
-                    _authResult.value = AuthResult.Success(user, isMaster, false)
+                    _authResult.value = AuthResult.Success(
+                        user = user,
+                        isMaster = isMaster,
+                        isNewUser = false  // ✨ ZMĚNA: Pojmenovaný parametr
+                    )
                 } else {
                     _authResult.value = AuthResult.Error("Nepodařilo se získat informace o uživateli.")
                 }
@@ -92,7 +96,6 @@ class AuthViewModel : ViewModel() {
                 if (result.user != null) {
                     val newUser = result.user!!
 
-                    // ✨ UPRAVENO: Přidán createdAt timestamp
                     val userData = hashMapOf(
                         "uid" to newUser.uid,
                         "email" to newUser.email,
@@ -104,13 +107,16 @@ class AuthViewModel : ViewModel() {
                         "fcmToken" to "",
                         "role" to "user",
                         "isDisabled" to false,
-                        "createdAt" to FieldValue.serverTimestamp() // ✨ Přidáno
+                        "createdAt" to FieldValue.serverTimestamp()
                     )
 
-                    // Uložíme dokument do Firestore
                     db.collection("users").document(newUser.uid).set(userData).await()
 
-                    _authResult.value = AuthResult.Success(newUser, false, true)
+                    _authResult.value = AuthResult.Success(
+                        user = newUser,
+                        isMaster = false,
+                        isNewUser = true  // ✨ ZMĚNA: Pojmenovaný parametr
+                    )
 
                 } else {
                     _authResult.value = AuthResult.Error("Nepodařilo se získat informace o uživateli po registraci.")

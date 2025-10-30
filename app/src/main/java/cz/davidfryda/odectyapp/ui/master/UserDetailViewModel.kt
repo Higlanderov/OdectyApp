@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.functions.ktx.functions
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
 import cz.davidfryda.odectyapp.data.Reading
@@ -19,13 +18,11 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.Date
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.functions.FirebaseFunctionsException
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
-import com.google.firebase.app
 
 class UserDetailViewModel : ViewModel() {
 
@@ -52,7 +49,6 @@ class UserDetailViewModel : ViewModel() {
     private val _deleteUserResult = MutableLiveData<SaveResult>(SaveResult.Idle)
     val deleteUserResult: LiveData<SaveResult> = _deleteUserResult
 
-    private val functions = Firebase.functions
 
     fun loadUserDetails(userId: String) {
         _isLoading.value = true
@@ -246,7 +242,7 @@ class UserDetailViewModel : ViewModel() {
                 // Nejdřív zjistíme, jestli je mazaný uživatel master
                 val userToDeleteDoc = try {
                     db.collection("users").document(userId).get().await()
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     Log.w(tag, "KROK 3: Dokument mazaného uživatele už neexistuje (možná byl smazán dříve)")
                     null
                 }
