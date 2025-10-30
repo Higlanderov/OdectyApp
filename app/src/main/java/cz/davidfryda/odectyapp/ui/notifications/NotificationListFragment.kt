@@ -55,24 +55,75 @@ class NotificationListFragment : BottomSheetDialogFragment(), NotificationClickL
     }
 
     override fun onNotificationClicked(notification: NotificationItem) {
-        Log.d(tag, "onNotificationClicked: Metoda volána pro notifikaci ID: ${notification.id}, Reading ID: ${notification.readingId}")
-        if (notification.readingId != null && notification.userId != null && notification.meterId != null) {
-            try {
-                val action = NavGraphDirections.actionGlobalReadingDetailFragment(
-                    readingId = notification.readingId,
-                    meterType = notification.meterType ?: "Obecný",
-                    isMasterView = true
-                )
-                dismiss()
-                findNavController().navigate(action)
-                Log.d(tag, "onNotificationClicked: Navigace na ReadingDetailFragment spuštěna s readingId=${notification.readingId}.")
-            } catch (e: Exception) {
-                Log.e(tag, "Chyba při navigaci z notifikace: ${e.message}", e)
-                Toast.makeText(context, "Chyba při otevírání detailu.", Toast.LENGTH_SHORT).show()
+        Log.d(tag, "onNotificationClicked: Metoda volána pro notifikaci ID: ${notification.id}")
+        Log.d(tag, "Notification type: ${notification.type}")
+
+        // Rozlišení podle typu notifikace
+        when (notification.type) {
+            "new_reading" -> {
+                // Notifikace o novém odečtu
+                if (notification.readingId != null && notification.userId != null && notification.meterId != null) {
+                    try {
+                        val action = NavGraphDirections.actionGlobalReadingDetailFragment(
+                            readingId = notification.readingId,
+                            meterType = notification.meterType ?: "Obecný",
+                            isMasterView = true
+                        )
+                        dismiss()
+                        findNavController().navigate(action)
+                        Log.d(tag, "Navigace na ReadingDetailFragment s readingId=${notification.readingId}.")
+                    } catch (e: Exception) {
+                        Log.e(tag, "Chyba při navigaci z notifikace: ${e.message}", e)
+                        Toast.makeText(context, "Chyba při otevírání detailu.", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Log.w(tag, "Nedostatek dat v notifikaci o odečtu.")
+                    Toast.makeText(context, "Nelze otevřít detail, chybí informace.", Toast.LENGTH_SHORT).show()
+                }
             }
-        } else {
-            Log.w(tag, "onNotificationClicked: Nedostatek dat v notifikaci pro navigaci (readingId=${notification.readingId}, userId=${notification.userId}, meterId=${notification.meterId}). Navigace nebude provedena.")
-            Toast.makeText(context, "Nelze otevřít detail, chybí informace v notifikaci.", Toast.LENGTH_SHORT).show()
+
+            "user_registered" -> {
+                // Notifikace o registraci nového uživatele
+                val userName = notification.userName ?: "Nový uživatel"
+                val userAddress = notification.userAddress ?: "bez adresy"
+
+                Log.d(tag, "Notifikace o registraci: $userName ($userAddress)")
+                Toast.makeText(
+                    context,
+                    "Nový uživatel: $userName\nAdresa: $userAddress",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                // Můžete přidat navigaci na seznam uživatelů, pokud existuje
+                // findNavController().navigate(R.id.masterUserListFragment)
+
+                dismiss()
+            }
+
+            else -> {
+                // Neznámý typ notifikace nebo starší notifikace bez typu
+                Log.w(tag, "Neznámý typ notifikace nebo chybí type field")
+
+                // Fallback pro starší notifikace (bez type field) - pokusíme se o navigaci na odečet
+                if (notification.readingId != null) {
+                    try {
+                        val action = NavGraphDirections.actionGlobalReadingDetailFragment(
+                            readingId = notification.readingId,
+                            meterType = notification.meterType ?: "Obecný",
+                            isMasterView = true
+                        )
+                        dismiss()
+                        findNavController().navigate(action)
+                        Log.d(tag, "Fallback navigace na ReadingDetailFragment.")
+                    } catch (e: Exception) {
+                        Log.e(tag, "Chyba při fallback navigaci: ${e.message}", e)
+                        Toast.makeText(context, "Nelze otevřít detail notifikace.", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(context, "Tuto notifikaci nelze otevřít.", Toast.LENGTH_SHORT).show()
+                    dismiss()
+                }
+            }
         }
     }
 

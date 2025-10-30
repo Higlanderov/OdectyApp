@@ -66,6 +66,9 @@ class MeterDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // NOVÉ: Resetujeme validaci při vstupu na obrazovku
+        viewModel.resetValidationResult()
+
         targetUserId = if (args.userId != null) {
             args.userId!!
         } else {
@@ -107,19 +110,25 @@ class MeterDetailFragment : Fragment() {
                 binding.takeReadingButton.isEnabled = result !is UploadResult.Loading
             }
             if (result is UploadResult.Success) {
-                Toast.makeText(requireContext(), "Odečet úspěšně zpracován!", Toast.LENGTH_SHORT).show()
+                // Zobrazíme toast POUZE pokud nejsou hodnoty (= skutečné uložení, ne jen validace)
+                if (lastEnteredValue == null && lastPhotoUri == null) {
+                    Toast.makeText(requireContext(), "Odečet úspěšně zpracován!", Toast.LENGTH_SHORT).show()
+                }
+                // ODSTRANĚNO: Nemazat hodnoty tady, smažou se v dialogu
+                // lastEnteredValue = null
+                // lastPhotoUri = null
             } else if (result is UploadResult.Error) {
                 Toast.makeText(requireContext(), "Chyba nahrávání: ${result.message}", Toast.LENGTH_LONG).show()
             }
         }
 
-        // NOVÉ: Pozorovatel pro výsledek validace
+        // Pozorovatel pro výsledek validace
         viewModel.validationResult.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is ValidationResult.WarningHigh -> showWarningDialog(result.message)
                 is ValidationResult.WarningLow -> showWarningDialog(result.message)
                 is ValidationResult.Error -> Toast.makeText(context, "Chyba: ${result.message}", Toast.LENGTH_LONG).show()
-                else -> { /* Validní, nic neděláme, uložení už proběhlo */ }
+                else -> { /* Validní, nic neděláme */ }
             }
         }
     }
@@ -133,7 +142,7 @@ class MeterDetailFragment : Fragment() {
     }
 
     private fun showManualInputDialog(photoUri: Uri) {
-        lastPhotoUri = photoUri // Uložíme si URI fotky
+        lastPhotoUri = photoUri
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_manual_reading, null)
         val photoPreview = dialogView.findViewById<ImageView>(R.id.dialogPhotoPreview)
         val editText = dialogView.findViewById<EditText>(R.id.dialogValueEditText)
@@ -148,13 +157,12 @@ class MeterDetailFragment : Fragment() {
             .setCancelable(false)
             .create()
 
-        saveButton.setOnClickListener { 
+        saveButton.setOnClickListener {
             val valueString = editText.text.toString()
             val valueDouble = valueString.toDoubleOrNull()
 
             if (valueDouble != null) {
-                lastEnteredValue = valueDouble // Uložíme si zadanou hodnotu
-                // Voláme novou funkci pro validaci
+                lastEnteredValue = valueDouble
                 viewModel.validateAndSaveReading(targetUserId, args.meterId, photoUri, valueDouble, requireContext())
                 dialog.dismiss()
             } else {
@@ -165,7 +173,7 @@ class MeterDetailFragment : Fragment() {
         dialog.show()
     }
 
-    // NOVÁ METODA: Zobrazí varovný dialog
+    // UPRAVENÁ METODA: Přidán reset validace
     private fun showWarningDialog(message: String) {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_warning, null)
         val messageTextView = dialogView.findViewById<TextView>(R.id.warningMessageTextView)
@@ -180,16 +188,37 @@ class MeterDetailFragment : Fragment() {
             .setCancelable(false)
             .create()
 
-        confirmButton.setOnClickListener { 
-            // Uživatel potvrdil, že chce hodnotu uložit.
+        confirmButton.setOnClickListener {
+            android.util.Log.d("MeterDetailFragment", "=== Confirm button clicked ===")
+            android.util.Log.d("MeterDetailFragment", "lastPhotoUri: $lastPhotoUri")
+            android.util.Log.d("MeterDetailFragment", "lastEnteredValue: $lastEnteredValue")
+
             if (lastPhotoUri != null && lastEnteredValue != null) {
+                android.util.Log.d("MeterDetailFragment", "Calling forceSaveReading...")
                 viewModel.forceSaveReading(targetUserId, args.meterId, lastPhotoUri!!, lastEnteredValue!!, requireContext())
+                viewModel.resetValidationResult()
+
+                // NOVÉ: Vymažeme hodnoty AŽ PO zavolání forceSaveReading
+                lastEnteredValue = null
+                lastPhotoUri = null
+
+                android.util.Log.d("MeterDetailFragment", "forceSaveReading called successfully")
+            } else {
+                android.util.Log.e("MeterDetailFragment", "lastPhotoUri or lastEnteredValue is NULL!")
+                viewModel.resetValidationResult()
             }
             dialog.dismiss()
         }
+
         cancelButton.setOnClickListener {
+            android.util.Log.d("MeterDetailFragment", "Cancel button clicked")
+            viewModel.resetValidationResult()
+            viewModel.resetUploadResult()
+            lastEnteredValue = null
+            lastPhotoUri = null
             dialog.dismiss()
         }
+
         dialog.show()
     }
 
@@ -215,7 +244,7 @@ class MeterDetailFragment : Fragment() {
             deleteOnExit()
         }
         return FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.provider", tmpFile)
-    } 
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()

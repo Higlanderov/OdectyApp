@@ -1,6 +1,7 @@
 package cz.davidfryda.odectyapp.data
 
 import com.google.firebase.firestore.PropertyName
+import com.google.firebase.Timestamp
 
 data class UserData(
     val uid: String = "",
@@ -12,7 +13,8 @@ data class UserData(
     val note: String = "",
 
     @get:PropertyName("isDisabled")
-    val isDisabled: Boolean = false
+    val isDisabled: Boolean = false,
+    val createdAt: Timestamp? = null
 )
 
 

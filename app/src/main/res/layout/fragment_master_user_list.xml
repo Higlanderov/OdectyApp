@@ -78,6 +78,22 @@
                         tools:ignore="LabelFor" />
                 </com.google.android.material.textfield.TextInputLayout>
 
+                <!-- ✨ NOVÝ: Filtr pro zablokované uživatele -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/blockedSpinnerLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:hint="@string/account_status">
+                    <AutoCompleteTextView
+                        android:id="@+id/blockedSpinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        tools:ignore="LabelFor" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -106,12 +122,49 @@
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/usersRecyclerView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:paddingTop="8dp"
             app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             tools:listitem="@layout/list_item_user" />
 
     </LinearLayout>
+
+    <!-- Progress Card -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/downloadProgressCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:layout_gravity="bottom"
+        android:visibility="gone"
+        app:cardElevation="8dp"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/downloadProgressText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Stahuji obrázky..."
+                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                android:layout_marginBottom="8dp"/>
+
+            <ProgressBar
+                android:id="@+id/downloadProgressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:max="100"/>
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Plovoucí tlačítko pro Export -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton

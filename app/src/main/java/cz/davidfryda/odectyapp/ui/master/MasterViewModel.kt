@@ -16,11 +16,30 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import android.content.Context
+import com.google.firebase.storage.ktx.storage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 enum class ReadingStatusFilter { DONE, PENDING, ALL }
 
+// ✨ NOVÝ: Enum pro filtr zablokování
+enum class BlockedFilter { ALL, ACTIVE, BLOCKED }
+
+// Sealed class pro stavy stahování
+sealed class DownloadProgress {
+    object Idle : DownloadProgress()
+    data class Downloading(val current: Int, val total: Int) : DownloadProgress()
+    object Complete : DownloadProgress()
+    data class Error(val message: String) : DownloadProgress()
+}
+
 class MasterViewModel : ViewModel() {
     private val db = Firebase.firestore
+    private val storage = Firebase.storage
     private val TAG = "MasterViewModel"
 
     private var allUsers = mapOf<String, UserData>()
@@ -33,11 +52,16 @@ class MasterViewModel : ViewModel() {
     private val _isFilterActive = MutableLiveData<Boolean>(false)
     val isFilterActive: LiveData<Boolean> = _isFilterActive
 
-    private var exportableData = listOf<FullReadingData>()
+    private val _downloadProgress = MutableLiveData<DownloadProgress>(DownloadProgress.Idle)
+    val downloadProgress: LiveData<DownloadProgress> = _downloadProgress
+
+    internal var exportableData = listOf<FullReadingData>()
     private var currentSearchText = ""
     private var currentStatusFilter = ReadingStatusFilter.ALL
     private var currentMonthFilter = Calendar.getInstance().get(Calendar.MONTH)
     private var currentYearFilter = Calendar.getInstance().get(Calendar.YEAR)
+    // ✨ NOVÉ: Proměnná pro filtr zablokování
+    private var currentBlockedFilter = BlockedFilter.ALL
 
     init {
         Log.d(TAG, "Initializing MasterViewModel")
@@ -79,13 +103,21 @@ class MasterViewModel : ViewModel() {
         }
     }
 
-    fun applyFilter(searchText: String? = null, status: ReadingStatusFilter? = null, month: Int? = null, year: Int? = null) {
+    // ✨ UPRAVENO: Přidán parametr blockedFilter
+    fun applyFilter(
+        searchText: String? = null,
+        status: ReadingStatusFilter? = null,
+        month: Int? = null,
+        year: Int? = null,
+        blockedFilter: BlockedFilter? = null
+    ) {
         searchText?.let { currentSearchText = it }
         status?.let { currentStatusFilter = it }
         month?.let { currentMonthFilter = it }
         year?.let { currentYearFilter = it }
+        blockedFilter?.let { currentBlockedFilter = it }
 
-        Log.d(TAG, "Applying filter: Search='$currentSearchText', Status=$currentStatusFilter, Month=$currentMonthFilter, Year=$currentYearFilter")
+        Log.d(TAG, "Applying filter: Search='$currentSearchText', Status=$currentStatusFilter, Month=$currentMonthFilter, Year=$currentYearFilter, Blocked=$currentBlockedFilter")
 
         // 1. Filtrování uživatelů podle textu
         val filteredUserIds = if (currentSearchText.isNotBlank()) {
@@ -99,11 +131,22 @@ class MasterViewModel : ViewModel() {
         }
         Log.d(TAG, "Filtered users by text count: ${filteredUserIds.size}")
 
+        // ✨ 1b. Filtrování podle stavu zablokování
+        val filteredByBlocked = when (currentBlockedFilter) {
+            BlockedFilter.ALL -> filteredUserIds
+            BlockedFilter.ACTIVE -> filteredUserIds.filter { uid ->
+                allUsers[uid]?.isDisabled == false
+            }.toSet()
+            BlockedFilter.BLOCKED -> filteredUserIds.filter { uid ->
+                allUsers[uid]?.isDisabled == true
+            }.toSet()
+        }
+        Log.d(TAG, "Filtered users by blocked status count: ${filteredByBlocked.size}")
 
         // 2. Příprava seznamu uživatelů pro UI
         val calendar = Calendar.getInstance()
         val usersWithStatus = allUsers.values
-            .filter { it.uid in filteredUserIds }
+            .filter { it.uid in filteredByBlocked }
             .map { user ->
                 val hasReading = allReadings.any { reading ->
                     calendar.time = reading.timestamp ?: Date(0)
@@ -139,7 +182,7 @@ class MasterViewModel : ViewModel() {
                 if (user != null && meter != null) {
                     newExportableData.add(FullReadingData(user, meter, reading))
                 } else {
-                    Log.w(TAG, "Skipping reading ${reading.id} for export: User or Meter not found (User found: ${user!=null}, Meter found: ${meter!=null}, MeterId was: ${reading.meterId})")
+                    Log.w(TAG, "Skipping reading ${reading.id} for export: User or Meter not found")
                 }
             }
         }
@@ -156,7 +199,8 @@ class MasterViewModel : ViewModel() {
         val isActive = currentSearchText.isNotBlank() ||
                 currentStatusFilter != ReadingStatusFilter.ALL ||
                 currentMonthFilter != defaultMonth ||
-                currentYearFilter != defaultYear
+                currentYearFilter != defaultYear ||
+                currentBlockedFilter != BlockedFilter.ALL  // ✨ Přidáno
         _isFilterActive.value = isActive
         Log.d(TAG, "Filter active status updated: $isActive")
     }
@@ -167,6 +211,7 @@ class MasterViewModel : ViewModel() {
         currentStatusFilter = ReadingStatusFilter.ALL
         currentMonthFilter = Calendar.getInstance().get(Calendar.MONTH)
         currentYearFilter = Calendar.getInstance().get(Calendar.YEAR)
+        currentBlockedFilter = BlockedFilter.ALL  // ✨ Přidáno
         applyFilter()
     }
 
@@ -219,9 +264,6 @@ class MasterViewModel : ViewModel() {
             dataRow.createCell(9).setCellValue(if (data.meter != null) getUnitForMeter(data.meter) else "")
         }
 
-        // --- ✨ ZMĚNA: Automatické přizpůsobení šířky bylo ODSTRANĚNO ---
-        // headers.indices.forEach { sheet.autoSizeColumn(it) } // TOTO ZPŮSOBOVALO PÁD
-
         val outputStream = ByteArrayOutputStream()
         workbook.write(outputStream)
         workbook.close()
@@ -235,5 +277,96 @@ class MasterViewModel : ViewModel() {
             "Voda" -> "m³"
             else -> ""
         }
+    }
+
+    suspend fun generateImagesZip(context: Context): ByteArray = withContext(Dispatchers.IO) {
+        Log.d(TAG, "=== Starting generateImagesZip ===")
+        Log.d(TAG, "Total exportableData records: ${exportableData.size}")
+
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        val zipOutputStream = ZipOutputStream(byteArrayOutputStream)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
+
+        try {
+            val recordsWithImages = exportableData.filter { !it.reading?.photoUrl.isNullOrEmpty() }
+            val totalImages = recordsWithImages.size
+
+            Log.d(TAG, "Records with images: $totalImages")
+
+            withContext(Dispatchers.Main) {
+                _downloadProgress.value = DownloadProgress.Downloading(0, totalImages)
+            }
+
+            var processedCount = 0
+            var skippedCount = 0
+
+            for ((index, data) in exportableData.withIndex()) {
+                val reading = data.reading
+                val photoUrl = reading?.photoUrl
+
+                Log.d(TAG, "Processing record ${index + 1}/${exportableData.size}")
+
+                if (photoUrl.isNullOrEmpty()) {
+                    Log.d(TAG, "  -> SKIPPED: No photo URL")
+                    skippedCount++
+                    continue
+                }
+
+                try {
+                    Log.d(TAG, "  -> Downloading ${processedCount + 1}/$totalImages")
+
+                    val photoRef = storage.getReferenceFromUrl(photoUrl)
+                    val imageBytes = photoRef.getBytes(Long.MAX_VALUE).await()
+                    Log.d(TAG, "  -> Downloaded ${imageBytes.size} bytes")
+
+                    val address = data.user.address.replace("[^a-zA-Z0-9]".toRegex(), "_")
+                    val timestamp = reading.timestamp?.let { dateFormat.format(it) } ?: "bez_data"
+                    val fileName = "${address}_${timestamp}.jpg"
+
+                    val zipEntry = ZipEntry(fileName)
+                    zipOutputStream.putNextEntry(zipEntry)
+                    zipOutputStream.write(imageBytes)
+                    zipOutputStream.closeEntry()
+
+                    processedCount++
+                    Log.d(TAG, "  -> SUCCESS ($processedCount/$totalImages)")
+
+                    withContext(Dispatchers.Main) {
+                        _downloadProgress.value = DownloadProgress.Downloading(processedCount, totalImages)
+                    }
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "  -> FAILED to download image", e)
+                    skippedCount++
+                }
+            }
+
+            Log.d(TAG, "=== ZIP generation complete ===")
+            Log.d(TAG, "Processed: $processedCount")
+            Log.d(TAG, "Skipped: $skippedCount")
+            Log.d(TAG, "ZIP size: ${byteArrayOutputStream.size()} bytes")
+
+            withContext(Dispatchers.Main) {
+                _downloadProgress.value = DownloadProgress.Complete
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Fatal error in generateImagesZip", e)
+
+            withContext(Dispatchers.Main) {
+                _downloadProgress.value = DownloadProgress.Error(e.message ?: "Neznámá chyba")
+            }
+
+            throw e
+        } finally {
+            zipOutputStream.close()
+        }
+
+        byteArrayOutputStream.toByteArray()
+    }
+
+    fun resetDownloadProgress() {
+        _downloadProgress.value = DownloadProgress.Idle
+        Log.d(TAG, "Download progress reset to Idle")
     }
 }

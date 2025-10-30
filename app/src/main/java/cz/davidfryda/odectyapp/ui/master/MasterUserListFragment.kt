@@ -24,6 +24,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.util.Log
+
 
 class MasterUserListFragment : Fragment() {
     private var _binding: FragmentMasterUserListBinding? = null
@@ -32,27 +36,92 @@ class MasterUserListFragment : Fragment() {
     private val viewModel: MasterViewModel by viewModels()
     private lateinit var userAdapter: UserListAdapter
 
+    private var pendingExportFormat: String? = null
+
     private val createFileLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        Log.d("MasterUserListFragment", "=== createFileLauncher callback ===")
+        Log.d("MasterUserListFragment", "resultCode: ${result.resultCode}")
+        Log.d("MasterUserListFragment", "pendingExportFormat: $pendingExportFormat")
+
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                val format = result.data?.getStringExtra("export_format")
-                try {
-                    requireContext().contentResolver.openOutputStream(uri)?.use { outputStream ->
-                        if (format == "csv") {
-                            val content = viewModel.generateCsvContent()
-                            outputStream.write(content.toByteArray())
-                        } else {
-                            val content = viewModel.generateXlsxContent()
-                            outputStream.write(content)
+                val format = pendingExportFormat
+                Log.d("MasterUserListFragment", "Format: $format, URI: $uri")
+
+                if (format == "images") {
+                    lifecycleScope.launch {
+                        try {
+                            Log.d("MasterUserListFragment", "=== Starting image export ===")
+                            Log.d("MasterUserListFragment", "exportableData size: ${viewModel.exportableData.size}")
+
+                            if (viewModel.exportableData.isEmpty()) {
+                                Toast.makeText(context, "Žádná data k exportu.", Toast.LENGTH_LONG).show()
+                                pendingExportFormat = null
+                                return@launch
+                            }
+
+                            Log.d("MasterUserListFragment", "Calling generateImagesZip...")
+
+                            val zipContent = viewModel.generateImagesZip(requireContext())
+
+                            Log.d("MasterUserListFragment", "ZIP generated, size: ${zipContent.size} bytes")
+
+                            requireContext().contentResolver.openOutputStream(uri)?.use { outputStream ->
+                                outputStream.write(zipContent)
+                            }
+
+                            Toast.makeText(context, "Obrázky úspěšně exportovány (${zipContent.size} bytes).", Toast.LENGTH_SHORT).show()
+
+                        } catch (e: Exception) {
+                            Log.e("MasterUserListFragment", "Chyba při exportu obrázků", e)
+                            Toast.makeText(context, "Chyba: ${e.message}", Toast.LENGTH_LONG).show()
+                        } finally {
+                            pendingExportFormat = null
                         }
                     }
-                    Toast.makeText(context, "Export úspěšně uložen.", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Chyba při ukládání souboru: ${e.message}", Toast.LENGTH_LONG).show()
+                    return@registerForActivityResult
+                }
+
+                // Pro CSV a XLSX (synchronní zpracování)
+                lifecycleScope.launch {
+                    try {
+                        Log.d("MasterUserListFragment", "Starting $format export")
+
+                        Toast.makeText(context, "Exportuji data...", Toast.LENGTH_SHORT).show()
+
+                        requireContext().contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            when (format) {
+                                "csv" -> {
+                                    val content = viewModel.generateCsvContent()
+                                    outputStream.write(content.toByteArray())
+                                    Log.d("MasterUserListFragment", "CSV export completed")
+                                }
+                                "xlsx" -> {
+                                    val content = viewModel.generateXlsxContent()
+                                    outputStream.write(content)
+                                    Log.d("MasterUserListFragment", "XLSX export completed")
+                                }
+                                else -> {
+                                    Log.w("MasterUserListFragment", "Unknown export format: $format")
+                                }
+                            }
+                        }
+
+                        Toast.makeText(context, "Export úspěšně uložen.", Toast.LENGTH_SHORT).show()
+
+                    } catch (e: Exception) {
+                        Log.e("MasterUserListFragment", "Chyba při exportu $format", e)
+                        Toast.makeText(context, "Chyba při ukládání souboru: ${e.message}", Toast.LENGTH_LONG).show()
+                    } finally {
+                        pendingExportFormat = null
+                    }
                 }
             }
+        } else {
+            Log.d("MasterUserListFragment", "Export cancelled or failed")
+            pendingExportFormat = null
         }
     }
 
@@ -74,6 +143,32 @@ class MasterUserListFragment : Fragment() {
             updateFilterButtonState(isActive)
         }
 
+        viewModel.downloadProgress.observe(viewLifecycleOwner) { progress ->
+            when (progress) {
+                is DownloadProgress.Idle -> {
+                    binding.downloadProgressCard.isVisible = false
+                }
+                is DownloadProgress.Downloading -> {
+                    binding.downloadProgressCard.isVisible = true
+                    val percentage = if (progress.total > 0) {
+                        (progress.current * 100) / progress.total
+                    } else 0
+                    binding.downloadProgressBar.progress = percentage
+                    binding.downloadProgressText.text =
+                        "Stahuji obrázky... (${progress.current}/${progress.total})"
+                }
+                is DownloadProgress.Complete -> {
+                    binding.downloadProgressCard.isVisible = false
+                    viewModel.resetDownloadProgress()
+                }
+                is DownloadProgress.Error -> {
+                    binding.downloadProgressCard.isVisible = false
+                    Toast.makeText(context, "Chyba: ${progress.message}", Toast.LENGTH_LONG).show()
+                    viewModel.resetDownloadProgress()
+                }
+            }
+        }
+
         binding.toggleFilterButton.setOnClickListener {
             val isVisible = !binding.filterCard.isVisible
             binding.filterCard.isVisible = isVisible
@@ -88,15 +183,26 @@ class MasterUserListFragment : Fragment() {
 
         binding.applyFilterButton.setOnClickListener {
             val searchText = binding.searchEditText.text.toString()
+
             val status = when (binding.statusSpinner.text.toString()) {
                 "Provedeno" -> ReadingStatusFilter.DONE
                 "Čekající" -> ReadingStatusFilter.PENDING
                 else -> ReadingStatusFilter.ALL
             }
+
+            // ✨ NOVÉ: Parsování filtru pro zablokované uživatele
+            val blockedFilter = when (binding.blockedSpinner.text.toString()) {
+                getString(R.string.blocked_users) -> BlockedFilter.BLOCKED
+                getString(R.string.active_users) -> BlockedFilter.ACTIVE
+                else -> BlockedFilter.ALL
+            }
+
             val months = resources.getStringArray(R.array.months_array)
             val selectedMonthIndex = months.indexOf(binding.monthSpinner.text.toString())
             val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-            viewModel.applyFilter(searchText, status, selectedMonthIndex, currentYear)
+
+            // ✨ UPRAVENO: Přidán parametr blockedFilter
+            viewModel.applyFilter(searchText, status, selectedMonthIndex, currentYear, blockedFilter)
             binding.filterCard.isVisible = false
         }
 
@@ -123,6 +229,7 @@ class MasterUserListFragment : Fragment() {
 
     private fun showExportFormatDialog() {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_export_format, null)
+        val imagesButton = dialogView.findViewById<Button>(R.id.exportImagesButton)
         val xlsxButton = dialogView.findViewById<Button>(R.id.exportXlsxButton)
         val csvButton = dialogView.findViewById<Button>(R.id.exportCsvButton)
 
@@ -131,12 +238,20 @@ class MasterUserListFragment : Fragment() {
             .setView(dialogView)
             .create()
 
+        imagesButton.setOnClickListener {
+            Log.d("MasterUserListFragment", "Images export button clicked")
+            createFile("images")
+            dialog.dismiss()
+        }
+
         xlsxButton.setOnClickListener {
+            Log.d("MasterUserListFragment", "XLSX export button clicked")
             createFile("xlsx")
             dialog.dismiss()
         }
 
         csvButton.setOnClickListener {
+            Log.d("MasterUserListFragment", "CSV export button clicked")
             createFile("csv")
             dialog.dismiss()
         }
@@ -145,18 +260,27 @@ class MasterUserListFragment : Fragment() {
     }
 
     private fun createFile(format: String) {
+        Log.d("MasterUserListFragment", "createFile called with format: $format")
+        pendingExportFormat = format
+
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             val currentDate = sdf.format(Date())
-            if (format == "csv") {
-                type = "text/csv"
-                putExtra(Intent.EXTRA_TITLE, "odecty_export_$currentDate.csv")
-            } else {
-                type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                putExtra(Intent.EXTRA_TITLE, "odecty_export_$currentDate.xlsx")
+            when (format) {
+                "csv" -> {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_TITLE, "odecty_export_$currentDate.csv")
+                }
+                "xlsx" -> {
+                    type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    putExtra(Intent.EXTRA_TITLE, "odecty_export_$currentDate.xlsx")
+                }
+                "images" -> {
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_TITLE, "odecty_obrazky_$currentDate.zip")
+                }
             }
-            putExtra("export_format", format)
         }
         createFileLauncher.launch(intent)
     }
@@ -167,6 +291,7 @@ class MasterUserListFragment : Fragment() {
     }
 
     private fun setupFilterSpinners() {
+        // Měsíce
         val months = resources.getStringArray(R.array.months_array)
         val monthAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, months)
         val monthSpinner = (binding.monthSpinnerLayout.editText as? AutoCompleteTextView)
@@ -175,12 +300,25 @@ class MasterUserListFragment : Fragment() {
         monthSpinner?.setText(currentMonthName, false)
         monthSpinner?.setOnClickListener { monthSpinner.showDropDown() }
 
+        // Status odečtu
         val statuses = listOf("Vše", "Provedeno", "Čekající")
         val statusAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, statuses)
         val statusSpinner = (binding.statusSpinnerLayout.editText as? AutoCompleteTextView)
         statusSpinner?.setAdapter(statusAdapter)
         statusSpinner?.setText(statuses[0], false)
         statusSpinner?.setOnClickListener { statusSpinner.showDropDown() }
+
+        // ✨ NOVÉ: Filtr pro zablokované uživatele
+        val blockedStatuses = listOf(
+            getString(R.string.all_users),
+            getString(R.string.active_users),
+            getString(R.string.blocked_users)
+        )
+        val blockedAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, blockedStatuses)
+        val blockedSpinner = (binding.blockedSpinnerLayout.editText as? AutoCompleteTextView)
+        blockedSpinner?.setAdapter(blockedAdapter)
+        blockedSpinner?.setText(blockedStatuses[0], false) // Defaultně "Vše"
+        blockedSpinner?.setOnClickListener { blockedSpinner.showDropDown() }
     }
 
     override fun onDestroyView() {

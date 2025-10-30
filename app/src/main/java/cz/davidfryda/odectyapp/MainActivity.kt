@@ -1,7 +1,6 @@
 package cz.davidfryda.odectyapp
 
-// --- ✨ PŘIDÁNO/UPRAVENO: Potřebné importy ---
-import android.net.Uri // Potřebné pro Uri
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -11,15 +10,15 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.PickVisualMediaRequest // Potřebné pro výběr obrázku
-import androidx.activity.result.contract.ActivityResultContracts // Potřebné pro výběr obrázku
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import androidx.core.content.edit // Potřebné pro SharedPreferences editaci
+import androidx.core.content.edit
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
-import androidx.lifecycle.lifecycleScope // Potřebné pro Coroutines
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -34,8 +33,9 @@ import coil.transform.CircleCropTransformation
 import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.badge.BadgeUtils
 import com.google.android.material.badge.ExperimentalBadgeUtils
-import com.google.android.material.dialog.MaterialAlertDialogBuilder // Potřebné pro dialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
@@ -47,22 +47,22 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import cz.davidfryda.odectyapp.workers.NotificationWorker
-import kotlinx.coroutines.Dispatchers // Potřebné pro Coroutines
-import kotlinx.coroutines.launch // Potřebné pro Coroutines
-import kotlinx.coroutines.withContext // Potřebné pro Coroutines
-import java.io.File // Potřebné pro práci se soubory
-import java.io.FileOutputStream // Potřebné pro práci se soubory
-import java.io.InputStream // Potřebné pro práci se soubory
-import java.io.IOException // Potřebné pro práci se soubory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.IOException
 import java.util.concurrent.TimeUnit
-// --- ✨ KONEC PŘIDANÝCH IMPORTŮ ---
 
 
-@ExperimentalBadgeUtils // Potřebné pro BadgeUtils
+@ExperimentalBadgeUtils
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var navController: NavController
+    private lateinit var auth: FirebaseAuth
 
     private var notificationBadge: BadgeDrawable? = null
     private var unreadListener: ListenerRegistration? = null
@@ -75,23 +75,28 @@ class MainActivity : AppCompatActivity() {
 
     private val tag = "MainActivity"
 
-    // --- ✨ PŘIDÁNO: ActivityResultLauncher pro výběr obrázku ---
+    // ✨ NOVÉ: Listener pro změny auth stavu
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val user = firebaseAuth.currentUser
+        if (user == null) {
+            Log.d(tag, "User logged out (possibly blocked), navigating to login")
+            navigateToLogin()
+        }
+    }
+
     private val pickMediaLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             Log.d(tag, "Vybráno URI obrázku: $uri")
             val user = Firebase.auth.currentUser
             if (user != null) {
-                // Kopírování obrázku v Coroutine mimo hlavní vlákno
                 lifecycleScope.launch(Dispatchers.IO) {
                     val internalPath = copyImageToInternalStorage(user.uid, uri)
                     if (internalPath != null) {
                         saveProfileImagePath(user.uid, internalPath)
-                        // Aktualizaci UI musíme provést zpět na hlavním vlákně
                         withContext(Dispatchers.Main) {
                             updateNavHeader(findViewById(R.id.nav_view))
                         }
                     } else {
-                        // Ošetření chyby kopírování (na hlavním vlákně)
                         withContext(Dispatchers.Main) {
                             Toast.makeText(this@MainActivity, "Chyba při ukládání obrázku.", Toast.LENGTH_SHORT).show()
                         }
@@ -102,12 +107,13 @@ class MainActivity : AppCompatActivity() {
             Log.d(tag, "Výběr obrázku zrušen.")
         }
     }
-    // --- ✨ KONEC PŘIDANÉHO LAUNCHERU ---
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        auth = Firebase.auth
 
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         ViewCompat.setOnApplyWindowInsetsListener(drawerLayout) { view, insets ->
@@ -150,13 +156,37 @@ class MainActivity : AppCompatActivity() {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
             updateToolbarMenuVisibility(destination)
+
+            val currentDestinations = setOf(R.id.mainFragment, R.id.masterUserListFragment)
+            if (destination.id in currentDestinations) {
+                updateNavHeader(navView)
+                Log.d(tag, "Header aktualizován po navigaci na domovskou obrazovku")
+            }
         }
 
         scheduleNotificationWorker()
+
+        // ✨ NOVÉ: Přidat listener pro detekci změn auth stavu
+        auth.addAuthStateListener(authStateListener)
     }
 
+    // ✨ NOVÉ: Funkce pro navigaci na login
+    private fun navigateToLogin() {
+        runOnUiThread {
+            if (navController.currentDestination?.id != R.id.loginFragment) {
+                val navOptions = NavOptions.Builder()
+                    .setPopUpTo(navController.graph.findStartDestination().id, true, saveState = false)
+                    .build()
+                try {
+                    navController.navigate(R.id.loginFragment, null, navOptions)
+                    Toast.makeText(this, "Váš účet byl zablokován", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Log.e(tag, "Chyba při navigaci na login po zablokování", e)
+                }
+            }
+        }
+    }
 
-    // --- ✨ PŘIDÁNO: Funkce pro kopírování obrázku ---
     private fun copyImageToInternalStorage(userId: String, sourceUri: Uri): String? {
         val fileName = "profile_image_$userId.jpg"
         val destinationFile = File(filesDir, fileName)
@@ -176,7 +206,7 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             Log.e(tag, "Chyba při kopírování obrázku do interního úložiště.", e)
-            destinationFile.delete() // Smažeme nekompletní soubor
+            destinationFile.delete()
             return null
         } finally {
             try {
@@ -187,7 +217,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    // --- ✨ KONEC FUNKCE KOPÍROVÁNÍ ---
 
     private fun updateToolbarMenuVisibility(destination: NavDestination) {
         val hideBellOnDestinations = setOf(
@@ -201,29 +230,19 @@ class MainActivity : AppCompatActivity() {
         notificationMenuItem?.isVisible = !shouldHideBell
         Log.d(tag, "Viditelnost zvonečku nastavena na: ${!shouldHideBell}")
 
-        // Vždy po změně viditelnosti ikony musíme aktualizovat i tečku
         updateBadgeVisibility()
     }
 
     private fun updateBadgeVisibility() {
-        // Tuto funkci voláme z různých míst, proto logiku přesouváme do post bloku,
-        // abychom zabránili "race conditions"
         toolbar.post {
             try {
                 notificationBadge?.let { badge ->
-                    // --- ✨ OPRAVA: Výpočet 'shouldShowBadge' je PŘESUNUT SEM DOVNITŘ ---
-                    // Tím zajistíme, že se vždy použijí nejaktuálnější hodnoty
                     val shouldShowBadge = (notificationMenuItem?.isVisible == true) && hasUnreadNotifications
                     Log.d(tag, "updateBadgeVisibility (v post): shouldShowBadge = $shouldShowBadge (iconVisible=${notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
 
-                    // Nejprve badge vždy odpojíme
                     BadgeUtils.detachBadgeDrawable(badge, toolbar, R.id.action_notifications)
 
                     if (shouldShowBadge) {
-                        // --- ✨ UKLIZENO: Odebrána redundantní řádka badge.number = ... ---
-                        // Číslo je již správně nastaveno v listeneru notifikací.
-
-                        // Znovu připojíme badge (který má již správné číslo)
                         BadgeUtils.attachBadgeDrawable(badge, toolbar, R.id.action_notifications)
                         Log.d(tag, "Badge připojen s počtem: ${badge.number}")
                     } else {
@@ -239,7 +258,9 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unreadListener?.remove()
-        Log.d(tag, "onDestroy: Listener notifikací odpojen.")
+        // ✨ NOVÉ: Odebrat listener při zničení aktivity
+        auth.removeAuthStateListener(authStateListener)
+        Log.d(tag, "onDestroy: Listener notifikací a auth odpojen.")
     }
 
     private fun setupNotificationBadge() {
@@ -395,8 +416,6 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-
-    // --- ✨ ZAČÁTEK UPRAVENÉ FUNKCE `updateNavHeader` ---
     private fun updateNavHeader(navView: NavigationView) {
         val headerView = navView.getHeaderView(0)
         val userNameTextView = headerView.findViewById<TextView>(R.id.userNameTextView)
@@ -406,10 +425,9 @@ class MainActivity : AppCompatActivity() {
         val user = Firebase.auth.currentUser
 
         if (user != null) {
-            val userId = user.uid // Uložíme si userId
+            val userId = user.uid
             userEmailTextView.text = user.email ?: "N/A"
 
-            // Načtení jména z Firestore (zůstává stejné)
             db.collection("users").document(userId).get()
                 .addOnSuccessListener { document ->
                     val userData = document.toObject(UserData::class.java)
@@ -430,36 +448,32 @@ class MainActivity : AppCompatActivity() {
                     unreadListener?.remove(); unreadListener = null; hasUnreadNotifications = false; notificationBadge?.number = 0; updateBadgeVisibility()
                 }
 
-            // Načtení obrázku (lokální > Google > default)
             val localImagePath = getProfileImagePath(userId)
-            var isLocalImageLoaded = false // Příznak, zda jsme načetli lokální obrázek
+            var isLocalImageLoaded = false
             if (localImagePath != null) {
                 val imageFile = File(localImagePath)
                 if (imageFile.exists()) {
                     Log.d(tag, "Načítám lokální profilový obrázek pro $userId z: $localImagePath")
-                    isLocalImageLoaded = true // Označíme, že lokální obrázek existuje
+                    isLocalImageLoaded = true
                     profileImageView.load(imageFile) {
                         crossfade(true)
                         placeholder(R.drawable.ic_profile)
-                        error(R.drawable.ic_profile) // Zobrazíme default, pokud lokální selže
+                        error(R.drawable.ic_profile)
                         transformations(CircleCropTransformation())
                     }
                 } else {
-                    // Soubor neexistuje, i když cesta je v SharedPreferences
                     Log.w(tag, "Lokální soubor obrázku nenalezen: $localImagePath. Mažu preferenci.")
-                    clearProfileImagePath(userId) // Odstraníme neplatnou cestu
-                    loadGoogleOrDefaultImage(profileImageView, user) // Načteme Google/default
+                    clearProfileImagePath(userId)
+                    loadGoogleOrDefaultImage(profileImageView, user)
                 }
             } else {
-                // Lokální cesta neexistuje, načteme Google/default
                 loadGoogleOrDefaultImage(profileImageView, user)
             }
 
-            // Nastavení OnClickListeneru podle toho, zda je lokální obrázek načten
             if (isLocalImageLoaded) {
                 profileImageView.setOnClickListener {
                     Log.d(tag, "Kliknuto na lokální profilový obrázek, zobrazuji dialog.")
-                    showImageOptionsDialog(userId) // Voláme nový dialog
+                    showImageOptionsDialog(userId)
                 }
             } else {
                 profileImageView.setOnClickListener {
@@ -469,36 +483,29 @@ class MainActivity : AppCompatActivity() {
             }
 
         } else {
-            // Uživatel není přihlášen
             userNameTextView.text = getString(R.string.not_logged_in)
             userEmailTextView.text = ""
             profileImageView.setImageResource(R.drawable.ic_profile)
-            profileImageView.setOnClickListener(null) // Odebrání listeneru
+            profileImageView.setOnClickListener(null)
             unreadListener?.remove(); unreadListener = null; hasUnreadNotifications = false; notificationBadge?.number = 0; updateBadgeVisibility()
         }
     }
-    // --- ✨ KONEC UPRAVENÉ FUNKCE `updateNavHeader` ---
 
-
-    // --- ✨ PŘIDÁNO: Pomocná funkce pro Google/default obrázek ---
     private fun loadGoogleOrDefaultImage(imageView: ImageView, user: com.google.firebase.auth.FirebaseUser) {
         if (user.photoUrl != null) {
             Log.d(tag, "Načítám profilový obrázek z Google URL pro ${user.uid}")
             imageView.load(user.photoUrl) {
                 crossfade(true)
                 placeholder(R.drawable.ic_profile)
-                error(R.drawable.ic_profile) // Pokud Google URL selže, zobrazíme default
+                error(R.drawable.ic_profile)
                 transformations(CircleCropTransformation())
             }
         } else {
             Log.d(tag, "Google URL nenalezeno, nastavuji výchozí ikonu.")
-            imageView.setImageResource(R.drawable.ic_profile) // Nastavíme defaultní drawable
+            imageView.setImageResource(R.drawable.ic_profile)
         }
     }
-    // --- ✨ KONEC POMOCNÉ FUNKCE ---
 
-
-    // --- ✨ PŘIDÁNO: Funkce pro práci s SharedPreferences ---
     private fun saveProfileImagePath(userId: String, path: String) {
         val sharedPref = getSharedPreferences("profile_images", MODE_PRIVATE) ?: return
         sharedPref.edit {
@@ -519,10 +526,7 @@ class MainActivity : AppCompatActivity() {
         }
         Log.d(tag, "Smazána cesta pro uživatele $userId")
     }
-    // --- ✨ KONEC FUNKCÍ PRO SHARED PREFERENCES ---
 
-
-    // --- ✨ PŘIDÁNO: Funkce pro zobrazení dialogu možností ---
     private fun showImageOptionsDialog(userId: String) {
         val options = arrayOf(
             getString(R.string.change_picture),
@@ -533,28 +537,23 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.change_profile_picture_title)
             .setItems(options) { dialog, which ->
                 when (which) {
-                    0 -> { // Změnit
+                    0 -> {
                         Log.d(tag, "Volba: Změnit obrázek.")
                         pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
-                    1 -> { // Odstranit
+                    1 -> {
                         Log.d(tag, "Volba: Odstranit obrázek.")
-                        deleteLocalProfileImage(userId) // Zavoláme funkci pro smazání
+                        deleteLocalProfileImage(userId)
                     }
                 }
-                // Dialog se zavře sám po výběru
             }
-            .setNegativeButton(R.string.cancel, null) // Jen zavře dialog
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
-    // --- ✨ KONEC FUNKCE PRO DIALOG ---
 
-
-    // --- ✨ PŘIDÁNO: Funkce pro smazání lokálního obrázku ---
     private fun deleteLocalProfileImage(userId: String) {
         val localImagePath = getProfileImagePath(userId)
         if (localImagePath != null) {
-            // Smazání souboru provádíme mimo hlavní vlákno
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     val file = File(localImagePath)
@@ -570,9 +569,7 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
                     Log.e(tag, "Chyba při mazání lokálního obrázku: $localImagePath", e)
                 } finally {
-                    // Po smazání (nebo pokusu) odstraníme cestu z SharedPreferences
                     clearProfileImagePath(userId)
-                    // Aktualizujeme hlavičku na hlavním vlákně
                     withContext(Dispatchers.Main) {
                         updateNavHeader(findViewById(R.id.nav_view))
                     }
@@ -580,12 +577,9 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             Log.d(tag, "Pokus o smazání, ale lokální obrázek neexistuje v SharedPreferences.")
-            // Pro jistotu aktualizujeme hlavičku, kdyby tam byl zobrazen omylem
             updateNavHeader(findViewById(R.id.nav_view))
         }
     }
-    // --- ✨ KONEC FUNKCE PRO SMAZÁNÍ ---
-
 
     override fun onSupportNavigateUp(): Boolean {
         return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()

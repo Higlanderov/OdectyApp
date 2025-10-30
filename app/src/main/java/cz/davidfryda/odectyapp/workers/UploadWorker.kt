@@ -31,7 +31,8 @@ class UploadWorker(appContext: Context, workerParams: WorkerParameters) :
         return try {
             // 1. Nahrání fotky ze souboru do Storage
             val file = File(offlineReading.localPhotoPath)
-            val photoRef = storage.reference.child("readings/${offlineReading.userId}/${file.name}")
+            // OPRAVENO: Přidán meterId do cesty
+            val photoRef = storage.reference.child("readings/${offlineReading.userId}/${offlineReading.meterId}/${file.name}")
             photoRef.putFile(Uri.fromFile(file)).await()
             val downloadUrl = photoRef.downloadUrl.await().toString()
 
@@ -54,7 +55,6 @@ class UploadWorker(appContext: Context, workerParams: WorkerParameters) :
             Result.success()
         } catch (e: Exception) {
             Log.e("UploadWorker", "Chyba při nahrávání offline odečtu.", e)
-            // Pokud nahrávání selže, zkusíme to příště znovu
             Result.retry()
         }
     }

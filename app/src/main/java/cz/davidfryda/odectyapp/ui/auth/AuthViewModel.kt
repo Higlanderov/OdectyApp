@@ -5,9 +5,9 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
@@ -32,6 +32,24 @@ class AuthViewModel : ViewModel() {
                     // Zjistíme, jestli je to úplně nový uživatel
                     val isNewUser = authResult.additionalUserInfo?.isNewUser ?: false
 
+                    // ✨ NOVÉ: Pokud je to nový uživatel, vytvoříme mu dokument s createdAt
+                    if (isNewUser) {
+                        val userData = hashMapOf(
+                            "uid" to user.uid,
+                            "email" to user.email,
+                            "name" to "",
+                            "surname" to "",
+                            "address" to "",
+                            "phoneNumber" to "",
+                            "note" to "",
+                            "fcmToken" to "",
+                            "role" to "user",
+                            "isDisabled" to false,
+                            "createdAt" to FieldValue.serverTimestamp() // ✨ Přidáno
+                        )
+                        db.collection("users").document(user.uid).set(userData).await()
+                    }
+
                     // Zkontrolujeme roli v databázi
                     val userDoc = db.collection("users").document(user.uid).get().await()
                     val isMaster = userDoc.getString("role") == "master"
@@ -55,7 +73,6 @@ class AuthViewModel : ViewModel() {
                 if (user != null) {
                     val userDoc = db.collection("users").document(user.uid).get().await()
                     val isMaster = userDoc.getString("role") == "master"
-                    // OPRAVENO: Přidán třetí parametr 'isNewUser = false'
                     _authResult.value = AuthResult.Success(user, isMaster, false)
                 } else {
                     _authResult.value = AuthResult.Error("Nepodařilo se získat informace o uživateli.")
@@ -75,9 +92,7 @@ class AuthViewModel : ViewModel() {
                 if (result.user != null) {
                     val newUser = result.user!!
 
-                    // --- ✨ OPRAVENÁ DATA PRO NOVÉHO UŽIVATELE ---
-                    // HashMap uživatele NESMÍ obsahovat pole "uid",
-                    // protože ID dokumentu je samo o sobě UID.
+                    // ✨ UPRAVENO: Přidán createdAt timestamp
                     val userData = hashMapOf(
                         "uid" to newUser.uid,
                         "email" to newUser.email,
@@ -86,9 +101,10 @@ class AuthViewModel : ViewModel() {
                         "address" to "",
                         "phoneNumber" to "",
                         "note" to "",
-                        "fcmToken" to "", // Přidáno chybějící pole (pro čistotu)
+                        "fcmToken" to "",
                         "role" to "user",
-                        "isDisabled" to false
+                        "isDisabled" to false,
+                        "createdAt" to FieldValue.serverTimestamp() // ✨ Přidáno
                     )
 
                     // Uložíme dokument do Firestore
