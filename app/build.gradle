@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace 'cz.davidfryda.odectyapp'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "cz.davidfryda.odectyapp"
         minSdk 26
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -32,6 +32,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = '17'
+        freeCompilerArgs += [
+                "-opt-in=com.google.android.material.badge.ExperimentalBadgeUtils"
+        ]
     }
     buildFeatures {
         viewBinding true

@@ -1,6 +1,11 @@
 package cz.davidfryda.odectyapp
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -28,11 +33,13 @@ import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.onNavDestinationSelected
 import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.badge.BadgeUtils
-import com.google.android.material.badge.ExperimentalBadgeUtils
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
@@ -43,20 +50,17 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.messaging.ktx.messaging
 import cz.davidfryda.odectyapp.data.UserData
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
 import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 
-@ExperimentalBadgeUtils
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
@@ -185,6 +189,9 @@ class MainActivity : AppCompatActivity() {
         updateNavHeader(navView)
         updateFcmToken()
 
+        // ✨ NOVÉ: Vytvoření notifikačních kanálů (včetně měsíčních připomínek)
+        createNotificationChannels()
+
         navController.addOnDestinationChangedListener { _, destination, _ ->
             Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
             updateToolbarMenuVisibility(destination)
@@ -214,6 +221,53 @@ class MainActivity : AppCompatActivity() {
         scheduleNotificationWorker()
 
         auth.addAuthStateListener(authStateListener)
+    }
+
+    // ✨ NOVÁ METODA: Vytvoření všech notifikačních kanálů
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            // Kanál pro mastery - nové odečty od uživatelů
+            val readingsChannel = NotificationChannel(
+                "new_readings",
+                "Nové odečty",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Upozornění na nové odečty uživatelů"
+                enableLights(true)
+                lightColor = Color.BLUE
+                enableVibration(true)
+            }
+
+            // ✨ NOVÝ kanál pro měsíční připomínky (pro běžné uživatele)
+            val monthlyRemindersChannel = NotificationChannel(
+                "monthly_reminders",
+                "Měsíční připomínky",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Připomínky k odeslání měsíčních odečtů"
+                enableLights(true)
+                lightColor = Color.GREEN
+                enableVibration(true)
+            }
+
+            // Kanál pro lokální připomínky z WorkManageru (záloha)
+            val localRemindersChannel = NotificationChannel(
+                "reading_reminder_channel",
+                "Lokální připomínky odečtů",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Záložní kanál pro lokální připomínky k provedení odečtu"
+            }
+
+            // Vytvoř všechny kanály
+            notificationManager.createNotificationChannel(readingsChannel)
+            notificationManager.createNotificationChannel(monthlyRemindersChannel)
+            notificationManager.createNotificationChannel(localRemindersChannel)
+
+            Log.d(tag, "✅ Všechny notifikační kanály vytvořeny (včetně monthly_reminders)")
+        }
     }
 
     private fun copyImageToInternalStorage(userId: String, sourceUri: Uri): String? {
