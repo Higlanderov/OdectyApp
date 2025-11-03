@@ -2,7 +2,6 @@ package cz.davidfryda.odectyapp
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -230,7 +229,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
             val readingsChannel = NotificationChannel(
                 "new_readings",
