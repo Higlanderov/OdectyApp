@@ -4,7 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.graphics.Color
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -228,7 +227,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
             val readingsChannel = NotificationChannel(
@@ -267,7 +265,7 @@ class MainActivity : AppCompatActivity() {
 
             Log.d(tag, "✅ Všechny notifikační kanály vytvořeny (včetně monthly_reminders)")
         }
-    }
+
 
     // ✨ UPRAVENO: Nastavení master settings - skrývá celou sekci pro běžné uživatele
     private fun setupMasterSettings(navView: NavigationView) {
