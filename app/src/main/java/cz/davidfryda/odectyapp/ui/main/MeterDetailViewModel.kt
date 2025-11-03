@@ -34,6 +34,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Date
+import java.util.Locale
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class MeterDetailViewModel : ViewModel() {
     private val db = Firebase.firestore
@@ -91,40 +94,221 @@ class MeterDetailViewModel : ViewModel() {
         }.asLiveData()
     }
 
+    // ✨ UPRAVENO: Nová validace s pokročilou statistikou
     fun validateAndSaveReading(userId: String, meterId: String, photoUri: Uri, manualValue: Double, context: Context) {
         viewModelScope.launch {
             _uploadResult.value = UploadResult.Loading
             try {
-                val lastReadingSnapshot = db.collection("readings")
+                // 1️⃣ Načti poslední odečty (až 5 pro lepší statistiku)
+                val recentReadingsSnapshot = db.collection("readings")
                     .whereEqualTo("userId", userId)
                     .whereEqualTo("meterId", meterId)
                     .orderBy("timestamp", Query.Direction.DESCENDING)
-                    .limit(1)
+                    .limit(5)
                     .get()
                     .await()
 
-                val lastReading = lastReadingSnapshot.documents.firstOrNull()?.toObject(Reading::class.java)
+                val recentReadings = recentReadingsSnapshot.documents
+                    .mapNotNull { it.toObject(Reading::class.java) }
+                    .sortedByDescending { it.timestamp }
 
-                if (lastReading?.finalValue == null) {
+                Log.d(tag, "validateAndSaveReading: Načteno ${recentReadings.size} historických odečtů")
+
+                // 2️⃣ Pokud neexistují předchozí odečty, ulož rovnou
+                if (recentReadings.isEmpty() || recentReadings.first().finalValue == null) {
+                    Log.d(tag, "validateAndSaveReading: První odečet, ukládám přímo")
                     forceSaveReading(userId, meterId, photoUri, manualValue, context)
                     return@launch
                 }
 
-                val lastValue = lastReading.finalValue
+                val lastValue = recentReadings.first().finalValue!!
 
+                // 3️⃣ PODMÍNKA 1: Nová hodnota je NIŽŠÍ než poslední
                 if (manualValue < lastValue) {
+                    Log.d(tag, "validateAndSaveReading: Hodnota je nižší než poslední ($manualValue < $lastValue)")
                     _uploadResult.value = UploadResult.Success
-                    _validationResult.value = ValidationResult.WarningLow("Nová hodnota ($manualValue) je nižší než poslední odečet ($lastValue). Opravdu chcete pokračovat?")
-                } else if (manualValue > lastValue * 2 && lastValue > 0) {
-                    _uploadResult.value = UploadResult.Success
-                    _validationResult.value = ValidationResult.WarningHigh("Nová hodnota ($manualValue) je o více než 100% vyšší než poslední odečet. Jste si jistý/á?")
-                } else {
-                    forceSaveReading(userId, meterId, photoUri, manualValue, context)
+                    _validationResult.value = ValidationResult.WarningLow(
+                        "Nová hodnota ($manualValue) je nižší než poslední odečet ($lastValue). Opravdu chcete pokračovat?"
+                    )
+                    return@launch
                 }
+
+                // 4️⃣ NOVÁ LOGIKA: Pokročilá validace proti historii
+                val validationResult = if (recentReadings.size >= 3) {
+                    Log.d(tag, "validateAndSaveReading: Použita pokročilá statistická validace")
+                    validateAgainstHistoryAdvanced(manualValue, recentReadings)
+                } else {
+                    Log.d(tag, "validateAndSaveReading: Použita jednoduchá validace (málo dat)")
+                    validateAgainstHistorySimple(manualValue, recentReadings)
+                }
+
+                when (validationResult) {
+                    is ValidationResult.WarningHigh -> {
+                        _uploadResult.value = UploadResult.Success
+                        _validationResult.value = validationResult
+                    }
+                    is ValidationResult.Valid -> {
+                        forceSaveReading(userId, meterId, photoUri, manualValue, context)
+                    }
+                    else -> {
+                        _uploadResult.value = UploadResult.Error("Neočekávaný výsledek validace")
+                    }
+                }
+
             } catch (e: Exception) {
                 Log.e(tag, "Chyba při validaci.", e)
                 _uploadResult.value = UploadResult.Error(e.message ?: "Chyba při validaci.")
             }
+        }
+    }
+
+    // 🆕 NOVÁ METODA: Pokročilá statistická validace (Z-score)
+    private fun validateAgainstHistoryAdvanced(newValue: Double, recentReadings: List<Reading>): ValidationResult {
+        // KONTROLA 1: Potřebujeme alespoň 3 odečty pro statistiku
+        if (recentReadings.size < 3) {
+            Log.d(tag, "validateAdvanced: Málo dat (${recentReadings.size} odečtů). Použit fallback.")
+            return validateAgainstHistorySimple(newValue, recentReadings)
+        }
+
+        // Výpočet rozdílů mezi po sobě jdoucími odečty
+        val differences = mutableListOf<Double>()
+        for (i in 0 until recentReadings.size - 1) {
+            val current = recentReadings[i].finalValue
+            val previous = recentReadings[i + 1].finalValue
+            if (current != null && previous != null && current > previous) {
+                differences.add(current - previous)
+            }
+        }
+
+        // KONTROLA 2: Potřebujeme alespoň 2 rozdíly
+        if (differences.size < 2) {
+            Log.d(tag, "validateAdvanced: Málo rozdílů (${differences.size}). Použit fallback.")
+            return validateAgainstHistorySimple(newValue, recentReadings)
+        }
+
+        // Výpočet statistických hodnot
+        val mean = differences.average()
+        val variance = differences.map { (it - mean).pow(2) }.average()
+        val standardDeviation = sqrt(variance)
+
+        val lastValue = recentReadings.first().finalValue!!
+        val currentIncrease = newValue - lastValue
+
+        Log.d(tag, "=== Pokročilá validace ===")
+        Log.d(tag, "Počet odečtů: ${recentReadings.size}")
+        Log.d(tag, "Poslední hodnoty: ${recentReadings.map { it.finalValue }}")
+        Log.d(tag, "Rozdíly: $differences")
+        Log.d(tag, "Průměr: $mean")
+        Log.d(tag, "Směrodatná odchylka: $standardDeviation")
+        Log.d(tag, "Aktuální nárůst: $currentIncrease")
+
+        // KONTROLA 3: Směrodatná odchylka je příliš malá (téměř konstantní spotřeba)
+        if (standardDeviation < 1.0) {
+            Log.d(tag, "validateAdvanced: Směrodatná odchylka příliš malá ($standardDeviation). Použit jednodušší výpočet.")
+            // Pokud je spotřeba téměř konstantní, použijeme toleranci 50%
+            return if (currentIncrease > mean * 1.5) {
+                ValidationResult.WarningHigh(
+                    "Spotřeba (${String.format(Locale.getDefault(), "%.1f", currentIncrease)}) je výrazně vyšší než obvykle " +
+                            "(průměr: ${String.format(Locale.getDefault(), "%.1f", mean)}). Je hodnota správně?"
+                )
+            } else {
+                ValidationResult.Valid
+            }
+        }
+
+        // Z-score: Kolik směrodatných odchylek je hodnota od průměru
+        val zScore = (currentIncrease - mean) / standardDeviation
+
+        Log.d(tag, "Z-score: $zScore")
+
+        // PRAVIDLA VALIDACE
+        return when {
+            zScore > 3 -> {
+                Log.d(tag, "validateAdvanced: Z-score > 3 → EXTRÉMNÍ ANOMÁLIE")
+                ValidationResult.WarningHigh(
+                    "Spotřeba je mimořádně vysoká (${String.format(Locale.getDefault(), "%.1f", currentIncrease)} vs průměr ${String.format(Locale.getDefault(), "%.1f", mean)}). " +
+                            "Zkontrolujte prosím odečet!"
+                )
+            }
+            zScore > 2 -> {
+                Log.d(tag, "validateAdvanced: Z-score > 2 → NEOBVYKLÁ HODNOTA")
+                ValidationResult.WarningHigh(
+                    "Spotřeba je neobvykle vysoká (${String.format(Locale.getDefault(), "%.1f", currentIncrease)} vs průměr ${String.format(Locale.getDefault(), "%.1f", mean)}). " +
+                            "Je hodnota správně?"
+                )
+            }
+            else -> {
+                Log.d(tag, "validateAdvanced: Z-score OK → VALIDNÍ")
+                ValidationResult.Valid
+            }
+        }
+    }
+
+    // 🆕 NOVÁ METODA: Jednoduchá validace pro málo dat
+    private fun validateAgainstHistorySimple(newValue: Double, recentReadings: List<Reading>): ValidationResult {
+        if (recentReadings.isEmpty()) {
+            return ValidationResult.Valid
+        }
+
+        val lastValue = recentReadings.first().finalValue ?: return ValidationResult.Valid
+
+        Log.d(tag, "=== Jednoduchá validace ===")
+        Log.d(tag, "Počet odečtů: ${recentReadings.size}")
+        Log.d(tag, "Poslední hodnota: $lastValue")
+        Log.d(tag, "Nová hodnota: $newValue")
+
+        // Pokud máme jen 1 historický záznam, použijeme pevný práh 100%
+        if (recentReadings.size == 1) {
+            Log.d(tag, "validateSimple: Jen 1 odečet → použit pevný práh 100%")
+            return if (newValue > lastValue * 2) {
+                ValidationResult.WarningHigh(
+                    "Nová hodnota ($newValue) je o více než 100% vyšší než poslední odečet ($lastValue). Jste si jistý/á?"
+                )
+            } else {
+                ValidationResult.Valid
+            }
+        }
+
+        // Pokud máme 2+ odečty, zkusíme jednoduchý průměr
+        val differences = mutableListOf<Double>()
+        for (i in 0 until recentReadings.size - 1) {
+            val current = recentReadings[i].finalValue
+            val previous = recentReadings[i + 1].finalValue
+            if (current != null && previous != null && current > previous) {
+                differences.add(current - previous)
+            }
+        }
+
+        if (differences.isEmpty()) {
+            Log.d(tag, "validateSimple: Žádné rozdíly → fallback na pevný práh")
+            // Fallback na pevný práh
+            return if (newValue > lastValue * 2) {
+                ValidationResult.WarningHigh(
+                    "Nová hodnota ($newValue) je o více než 100% vyšší než poslední odečet ($lastValue). Jste si jistý/á?"
+                )
+            } else {
+                ValidationResult.Valid
+            }
+        }
+
+        // Máme alespoň 1 rozdíl, použijeme toleranci 3× průměr
+        val averageIncrease = differences.average()
+        val currentIncrease = newValue - lastValue
+
+        Log.d(tag, "validateSimple: Rozdíly: $differences")
+        Log.d(tag, "validateSimple: Průměrná spotřeba: $averageIncrease")
+        Log.d(tag, "validateSimple: Aktuální nárůst: $currentIncrease")
+
+        return if (currentIncrease > averageIncrease * 3) {
+            val percentageIncrease = ((currentIncrease / averageIncrease - 1) * 100).toInt()
+            Log.d(tag, "validateSimple: Nárůst ${percentageIncrease}% nad průměrem → VAROVÁNÍ")
+            ValidationResult.WarningHigh(
+                "Spotřeba je ${percentageIncrease}% vyšší než Váš průměr (${String.format(Locale.getDefault(), "%.1f", averageIncrease)}). " +
+                        "Aktuální nárůst: ${String.format(Locale.getDefault(), "%.1f", currentIncrease)}. Zkontrolujte prosím hodnotu."
+            )
+        } else {
+            Log.d(tag, "validateSimple: V toleranci → VALIDNÍ")
+            ValidationResult.Valid
         }
     }
 
@@ -261,7 +445,6 @@ class MeterDetailViewModel : ViewModel() {
         }
     }
 
-    // ZMĚNĚNO: Varianta 2 - fotka se smaže PŘED dokumentem
     fun deleteReading(readingId: String, photoUrl: String?, context: Context) {
         viewModelScope.launch {
             Log.d(tag, "=== deleteReading called ===")
@@ -299,7 +482,7 @@ class MeterDetailViewModel : ViewModel() {
                 return@launch
             }
 
-            // Online mazání - ZMĚNĚNO: NEJDŘÍV fotka, PAK dokument
+            // Online mazání - NEJDŘÍV fotka, PAK dokument
             _deleteResult.value = UploadResult.Loading
             try {
                 // 1. NEJDŘÍV smazat fotku ze Storage (pokud existuje URL)
@@ -350,7 +533,7 @@ class MeterDetailViewModel : ViewModel() {
         _validationResult.value = ValidationResult.Valid
         Log.d(tag,"resetUploadResult: Stav resetován na Idle.")
     }
-    // Funkce pro resetování stavu validace
+
     fun resetValidationResult() {
         _validationResult.value = ValidationResult.Valid
         Log.d(tag, "resetValidationResult: Stav resetován na Valid.")

@@ -273,11 +273,13 @@ class MainActivity : AppCompatActivity() {
     private fun setupMasterSettings(navView: NavigationView) {
         val user = Firebase.auth.currentUser
         val menu = navView.menu
-        val masterSettingsSection = menu.findItem(R.id.master_settings_section)
+        val masterGroup = menu.findItem(R.id.master_settings_section)
+        val hideProfileItem = menu.findItem(R.id.hide_profile_action)
 
         if (user == null) {
-            // Pokud není přihlášen, skryj celou sekci
-            masterSettingsSection?.isVisible = false
+            masterGroup?.isVisible = false
+            // ✨ NOVÉ: Skryj také actionView (switch)
+            hideProfileItem?.actionView?.visibility = View.GONE
             Log.d(tag, "Uživatel není přihlášen, master settings skryty")
             return
         }
@@ -286,45 +288,56 @@ class MainActivity : AppCompatActivity() {
             .addOnSuccessListener { document ->
                 val isMaster = document.getString("role") == "master"
 
-                // ✅ Zobraz/skryj celou sekci podle role
-                masterSettingsSection?.isVisible = isMaster
+                masterGroup?.isVisible = isMaster
 
                 if (isMaster) {
                     Log.d(tag, "Master detekován, zobrazuji master settings")
 
-                    // Najdi položku se switchem
-                    val hideProfileItem = menu.findItem(R.id.hide_profile_action)
+                    // ✨ NOVÉ: Zobraz actionView (switch)
+                    hideProfileItem?.actionView?.visibility = View.VISIBLE
 
-                    // Získej switch z actionView
-                    val switchView = hideProfileItem?.actionView?.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchHideProfile)
+                    navView.post {
+                        val switchView = hideProfileItem?.actionView?.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchHideProfile)
 
-                    if (switchView != null) {
-                        // Načti stav z Firestore
-                        val hideFromList = document.getBoolean("hideFromMasterList") ?: false
+                        if (switchView != null) {
+                            val hideFromList = document.getBoolean("hideFromMasterList") ?: false
 
-                        // Odstraň starý listener (prevence duplicit)
-                        switchView.setOnCheckedChangeListener(null)
+                            Log.d(tag, "Switch nalezen, nastavuji hodnotu: $hideFromList")
 
-                        // Nastav stav
-                        switchView.isChecked = hideFromList
+                            // Odstraň všechny listenery
+                            switchView.setOnCheckedChangeListener(null)
 
-                        // Přidej listener
-                        switchView.setOnCheckedChangeListener { _, isChecked ->
-                            updateHideFromMasterList(user.uid, isChecked)
+                            // Nastav stav
+                            switchView.isChecked = hideFromList
+
+                            // Ujisti se, že je switch aktivní
+                            switchView.isClickable = true
+                            switchView.isEnabled = true
+
+                            // Přidej listener
+                            switchView.setOnCheckedChangeListener { buttonView, isChecked ->
+                                Log.d(tag, "Switch changed to: $isChecked")
+                                updateHideFromMasterList(user.uid, isChecked)
+                            }
+
+                            Log.d(tag, "✅ Master switch nastaven: hideFromList=$hideFromList, clickable=${switchView.isClickable}, enabled=${switchView.isEnabled}")
+                        } else {
+                            Log.e(tag, "❌ Switch nebyl nalezen v actionView")
                         }
-
-                        Log.d(tag, "✅ Master switch nastaven (hideFromList=$hideFromList)")
-                    } else {
-                        Log.e(tag, "❌ Switch nebyl nalezen v actionView")
                     }
                 } else {
                     Log.d(tag, "Běžný uživatel, master settings skryty")
+
+                    // ✨ DŮLEŽITÉ: Explicitně skryj actionView (switch) pro běžné uživatele
+                    hideProfileItem?.actionView?.visibility = View.GONE
+                    Log.d(tag, "ActionView (switch) nastaven na GONE")
                 }
             }
             .addOnFailureListener { e ->
                 Log.e(tag, "Chyba při kontrole role uživatele", e)
-                // V případě chyby skryj sekci
-                masterSettingsSection?.isVisible = false
+                masterGroup?.isVisible = false
+                // ✨ NOVÉ: Skryj také actionView při chybě
+                hideProfileItem?.actionView?.visibility = View.GONE
             }
     }
 
@@ -503,6 +516,20 @@ class MainActivity : AppCompatActivity() {
 
             when (menuItem.itemId) {
                 R.id.logout_action -> {
+                    // ✨ NOVÉ: Smaž FCM token při odhlášení
+                    val currentUser = Firebase.auth.currentUser
+                    if (currentUser != null) {
+                        Log.d(tag, "Mazání FCM tokenu pro uživatele: ${currentUser.uid}")
+                        db.collection("users").document(currentUser.uid)
+                            .update("fcmToken", com.google.firebase.firestore.FieldValue.delete())
+                            .addOnSuccessListener {
+                                Log.d(tag, "✅ FCM token úspěšně smazán z Firestore")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e(tag, "❌ Chyba při mazání FCM tokenu", e)
+                            }
+                    }
+
                     Firebase.auth.signOut()
                     hasUnreadNotifications = false
                     unreadListener?.remove()

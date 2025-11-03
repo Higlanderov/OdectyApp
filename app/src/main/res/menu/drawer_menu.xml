@@ -13,27 +13,36 @@
             android:title="@string/profile" />
     </group>
 
-    <!-- ✨ NOVÁ SEKCE: Nastavení správce (s ID pro skupinu) -->
-    <item
-        android:id="@+id/master_settings_section"
-        android:title="@string/admin_settings"
-        android:visible="false">
-        <menu>
-            <item
-                android:id="@+id/hide_profile_action"
-                android:icon="@drawable/ic_visibility_off"
-                android:title="@string/hide_my_profile"
-                app:actionLayout="@layout/switch_only" />
-        </menu>
-    </item>
+    <!-- ✨ UPRAVENO: Nastavení správce - defaultně skryté -->
+    <group
+        android:id="@+id/master_settings_group"
+        android:checkableBehavior="none">
+        <item
+            android:id="@+id/master_settings_section"
+            android:title="@string/admin_settings"
+            android:visible="false">
+            <menu>
+                <item
+                    android:id="@+id/hide_profile_action"
+                    android:icon="@drawable/ic_visibility_off"
+                    android:title="@string/hide_my_profile"
+                    app:actionLayout="@layout/switch_only" />
+            </menu>
+        </item>
+    </group>
 
-    <item android:title="@string/account">
-        <menu>
-            <item
-                android:id="@+id/logout_action"
-                android:icon="@drawable/ic_logout"
-                android:title="@string/logout" />
-        </menu>
-    </item>
+    <!-- ✨ UPRAVENO: Účet v separátní skupině -->
+    <group
+        android:id="@+id/account_group"
+        android:checkableBehavior="none">
+        <item android:title="@string/account">
+            <menu>
+                <item
+                    android:id="@+id/logout_action"
+                    android:icon="@drawable/ic_logout"
+                    android:title="@string/logout" />
+            </menu>
+        </item>
+    </group>
 
 </menu>
