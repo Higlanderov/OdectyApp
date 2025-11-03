@@ -20,6 +20,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
@@ -52,6 +53,10 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
     private var currentUserIsDisabled: Boolean = false
 
+    // ✨ Dynamicky vytvořený MapView
+    private var dynamicMapView: MapView? = null
+    private var isMapInitialized = false
+
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -63,10 +68,8 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.mapView.onCreate(savedInstanceState)
-        binding.mapView.getMapAsync(this)
+        // ✅ MapView se vytvoří až když je potřeba (v updateMapDisplay)
 
-        // ✨ NOVÉ: Nastavit default title okamžitě
         activity?.title = getString(R.string.user_detail_title_default)
         Log.d(tag, "Default title set in onViewCreated")
 
@@ -152,7 +155,7 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             binding.userEmailValue.visibility = contentVisibility
             binding.userUidLabel.visibility = contentVisibility
             binding.userUidValue.visibility = contentVisibility
-            binding.mapView.visibility = contentVisibility
+            binding.mapContainer.visibility = contentVisibility
             binding.divider.visibility = contentVisibility
             binding.meterCountLabel.visibility = contentVisibility
             binding.meterCountValue.visibility = contentVisibility
@@ -296,20 +299,54 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         updateMapDisplay()
     }
 
+    // ✅ UPRAVENO: Dynamicky vytváří MapView až když je potřeba
     private fun updateMapDisplay() {
         val currentAddress = userAddress
-        if (googleMap != null && !currentAddress.isNullOrEmpty() && _binding != null) {
-            binding.mapView.isVisible = true
-            geocodeAddress(currentAddress)
+        if (!currentAddress.isNullOrEmpty() && _binding != null) {
+            // Vytvoř MapView pouze jednou, když máme adresu
+            if (!isMapInitialized) {
+                try {
+                    Log.d(tag, "Creating MapView dynamically...")
+
+                    // Vytvoř MapView programově
+                    val mapView = MapView(requireContext())
+
+                    // Přidej do kontejneru
+                    binding.mapContainer.removeAllViews()
+                    binding.mapContainer.addView(mapView, ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    ))
+
+                    // Inicializuj MapView
+                    mapView.onCreate(null)
+                    mapView.getMapAsync(this)
+
+                    // Ulož referenci
+                    dynamicMapView = mapView
+                    isMapInitialized = true
+
+                    Log.d(tag, "MapView dynamically created and initialized successfully")
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed to create MapView dynamically", e)
+                    binding.mapContainer.visibility = View.GONE
+                    return
+                }
+            }
+
+            binding.mapContainer.visibility = View.VISIBLE
+            if (googleMap != null) {
+                geocodeAddress(currentAddress)
+            }
         } else if (_binding != null) {
-            binding.mapView.isVisible = false
+            binding.mapContainer.visibility = View.GONE
         }
     }
 
     private fun geocodeAddress(addressString: String) {
         if (!Geocoder.isPresent()) {
             Log.w(tag, "Geocoder není dostupný.")
-            _binding?.mapView?.isVisible = false
+            _binding?.mapContainer?.visibility = View.GONE
             return
         }
         val geocoder = Geocoder(requireContext(), Locale.getDefault())
@@ -324,13 +361,13 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                             updateMapLocation()
                         } else {
                             Log.w(tag, "Pro adresu '$addressString' nebyly nalezeny žádné souřadnice.")
-                            binding.mapView.isVisible = false
+                            binding.mapContainer.visibility = View.GONE
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Chyba při geokódování (API 33+): ${e.message}", e)
-                activity?.runOnUiThread { _binding?.mapView?.isVisible = false }
+                activity?.runOnUiThread { _binding?.mapContainer?.visibility = View.GONE }
             }
         } else {
             @Suppress("DEPRECATION")
@@ -345,15 +382,15 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
                             updateMapLocation()
                         } else {
                             Log.w(tag, "Pro adresu '$addressString' nebyly nalezeny žádné souřadnice.")
-                            binding.mapView.isVisible = false
+                            binding.mapContainer.visibility = View.GONE
                         }
                     }
                 } catch (e: IOException) {
                     Log.e(tag, "Chyba při geokódování adresy '$addressString'", e)
-                    withContext(Dispatchers.Main) { _binding?.mapView?.isVisible = false }
+                    withContext(Dispatchers.Main) { _binding?.mapContainer?.visibility = View.GONE }
                 } catch (e: Exception) {
                     Log.e(tag, "Neočekávaná chyba při geokódování: ${e.message}", e)
-                    withContext(Dispatchers.Main) { _binding?.mapView?.isVisible = false }
+                    withContext(Dispatchers.Main) { _binding?.mapContainer?.visibility = View.GONE }
                 }
             }
         }
@@ -392,9 +429,8 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        _binding?.mapView?.onResume()
+        dynamicMapView?.onResume()
 
-        // ✨ OPRAVENO: Použít userData místo userName
         viewModel.userData.value?.let { user ->
             val fullName = "${user.name} ${user.surname}".trim()
             activity?.title = getString(R.string.user_detail_title_with_name, fullName)
@@ -405,10 +441,37 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    override fun onStart() { super.onStart(); _binding?.mapView?.onStart() }
-    override fun onStop() { super.onStop(); _binding?.mapView?.onStop() }
-    override fun onPause() { super.onPause(); _binding?.mapView?.onPause() }
-    override fun onDestroyView() { super.onDestroyView(); _binding?.mapView?.onDestroy(); googleMap = null; _binding = null }
-    override fun onLowMemory() { super.onLowMemory(); _binding?.mapView?.onLowMemory() }
-    override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); _binding?.mapView?.onSaveInstanceState(outState) }
+    override fun onStart() {
+        super.onStart()
+        dynamicMapView?.onStart()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        dynamicMapView?.onStop()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        dynamicMapView?.onPause()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        dynamicMapView?.onDestroy()
+        dynamicMapView = null
+        googleMap = null
+        isMapInitialized = false
+        _binding = null
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        dynamicMapView?.onLowMemory()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        dynamicMapView?.onSaveInstanceState(outState)
+    }
 }

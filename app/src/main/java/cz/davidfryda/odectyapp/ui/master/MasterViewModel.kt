@@ -61,25 +61,38 @@ class MasterViewModel : ViewModel() {
 
     init {
         Log.d(tag, "Initializing MasterViewModel")
+
+        // ✨ OPRAVENO: Načítání uživatelů s filtrováním
         db.collection("users").addSnapshotListener { usersSnapshot, error ->
             if (error != null) {
                 Log.e(tag, "Error fetching users", error)
                 return@addSnapshotListener
             }
-            usersSnapshot?.let { snapshot ->  // ✨ ZMĚNA: it → snapshot
+            usersSnapshot?.let { snapshot ->
                 allUsers = snapshot.documents.mapNotNull { doc ->
                     doc.toObject(UserData::class.java)?.copy(uid = doc.id)
-                }.associateBy { it.uid }
-                Log.d(tag, "Fetched ${allUsers.size} users")
+                }
+                    // ✨ FILTR: Vyřaď pouze uživatele s hideFromMasterList = true
+                    // (Všichni ostatní včetně masterů se zobrazí)
+                    .filter { user ->
+                        val shouldInclude = user.hideFromMasterList != true
+                        if (!shouldInclude) {
+                            Log.d(tag, "Filtering out user: ${user.uid} (hideFromMasterList=${user.hideFromMasterList})")
+                        }
+                        shouldInclude
+                    }
+                    .associateBy { it.uid }
+                Log.d(tag, "Fetched ${allUsers.size} users (excluding hidden profiles)")
                 applyFilter()
             }
         }
+
         db.collectionGroup("meters").addSnapshotListener { metersSnapshot, error ->
             if (error != null) {
                 Log.e(tag, "Error fetching meters", error)
                 return@addSnapshotListener
             }
-            metersSnapshot?.let { snapshot ->  // ✨ ZMĚNA: it → snapshot
+            metersSnapshot?.let { snapshot ->
                 allMeters = snapshot.documents.mapNotNull { doc ->
                     val meter = doc.toObject(Meter::class.java)?.copy(id = doc.id)
                     meter
@@ -88,12 +101,13 @@ class MasterViewModel : ViewModel() {
                 applyFilter()
             }
         }
+
         db.collection("readings").addSnapshotListener { readingsSnapshot, error ->
             if (error != null) {
                 Log.e(tag, "Error fetching readings", error)
                 return@addSnapshotListener
             }
-            readingsSnapshot?.let { snapshot ->  // ✨ ZMĚNA: it → snapshot
+            readingsSnapshot?.let { snapshot ->
                 allReadings = snapshot.documents.mapNotNull { doc ->
                     doc.toObject(Reading::class.java)?.copy(id = doc.id)
                 }

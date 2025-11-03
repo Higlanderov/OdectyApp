@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Odecty</string>
+    <string name="app_name">OdectyApp</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
 
     <string name="empty_main_view_text">Zatím nemáte přidané žádné měřáky.\nZačněte kliknutím na tlačítko +.</string>
@@ -122,6 +122,21 @@
     <string name="user_detail_title_with_name">Přehled - %1$s</string>
     <string name="user_detail_title_default">Přehled uživatele</string>
     <string name="master_user_detail_default_title">Měřáky uživatele</string>
+    <string name="home">Domů</string>
+    <string name="profile">Profil</string>
+    <string name="admin_settings">Nastavení správce</string>
+    <string name="hide_my_profile">Skrýt můj profil</string>
+    <string name="account">Účet</string>
+    <string name="logout">Odhlásit se</string>
+    <string name="empty_chart_text">Pro zobrazení grafu je potřeba alespoň dva odečty.</string>
+    <string name="login_title">Přihlášení</string>
+    <string name="login_email_hint">E-mail</string>
+    <string name="login_password_hint">Heslo</string>
+    <string name="login_button_text">Přihlásit se</string>
+    <string name="login_register_prompt">Ještě nemáte účet? Zaregistrujte se</string>
+    <string name="login_google_sign_in">Přihlásit se přes Google</string>
+    <string name="user_detail_button_description">Zobrazit detail uživatele</string>
+
 
     <string-array name="months_array">
         <item>Leden</item>

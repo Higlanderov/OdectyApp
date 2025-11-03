@@ -40,6 +40,7 @@ import coil.load
 import coil.transform.CircleCropTransformation
 import com.google.android.material.badge.BadgeDrawable
 import com.google.android.material.badge.BadgeUtils
+import com.google.android.material.badge.ExperimentalBadgeUtils
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
@@ -60,7 +61,7 @@ import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 
-
+@ExperimentalBadgeUtils
 class MainActivity : AppCompatActivity() {
 
     private lateinit var appBarConfiguration: AppBarConfiguration
@@ -178,7 +179,11 @@ class MainActivity : AppCompatActivity() {
         setupNotificationBadge()
 
         drawerLayout.addDrawerListener(object : DrawerLayout.DrawerListener {
-            override fun onDrawerOpened(drawerView: View) { updateNavHeader(navView) }
+            override fun onDrawerOpened(drawerView: View) {
+                updateNavHeader(navView)
+                // ✨ Aktualizuj master settings při otevření drawer
+                setupMasterSettings(navView)
+            }
             override fun onDrawerSlide(drawerView: View, slideOffset: Float) {}
             override fun onDrawerClosed(drawerView: View) {}
             override fun onDrawerStateChanged(newState: Int) {}
@@ -186,20 +191,20 @@ class MainActivity : AppCompatActivity() {
 
         setupDrawerNavigation(navView, drawerLayout)
 
+        // ✨ Inicializuj master settings
+        setupMasterSettings(navView)
+
         updateNavHeader(navView)
         updateFcmToken()
 
-        // ✨ NOVÉ: Vytvoření notifikačních kanálů (včetně měsíčních připomínek)
         createNotificationChannels()
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
             Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
             updateToolbarMenuVisibility(destination)
 
-            // ✨ Pouze masterUserDetailFragment má vlastní title management
             val fragmentsWithCustomTitle = setOf(
-                R.id.masterUserDetailFragment  // ✨ Jen tento!
-                // userDetailFragment NENÍ v seznamu - použije label z nav_graph
+                R.id.masterUserDetailFragment
             )
 
             if (destination.id in fragmentsWithCustomTitle) {
@@ -223,12 +228,10 @@ class MainActivity : AppCompatActivity() {
         auth.addAuthStateListener(authStateListener)
     }
 
-    // ✨ NOVÁ METODA: Vytvoření všech notifikačních kanálů
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            // Kanál pro mastery - nové odečty od uživatelů
             val readingsChannel = NotificationChannel(
                 "new_readings",
                 "Nové odečty",
@@ -240,7 +243,6 @@ class MainActivity : AppCompatActivity() {
                 enableVibration(true)
             }
 
-            // ✨ NOVÝ kanál pro měsíční připomínky (pro běžné uživatele)
             val monthlyRemindersChannel = NotificationChannel(
                 "monthly_reminders",
                 "Měsíční připomínky",
@@ -252,7 +254,6 @@ class MainActivity : AppCompatActivity() {
                 enableVibration(true)
             }
 
-            // Kanál pro lokální připomínky z WorkManageru (záloha)
             val localRemindersChannel = NotificationChannel(
                 "reading_reminder_channel",
                 "Lokální připomínky odečtů",
@@ -261,13 +262,90 @@ class MainActivity : AppCompatActivity() {
                 description = "Záložní kanál pro lokální připomínky k provedení odečtu"
             }
 
-            // Vytvoř všechny kanály
             notificationManager.createNotificationChannel(readingsChannel)
             notificationManager.createNotificationChannel(monthlyRemindersChannel)
             notificationManager.createNotificationChannel(localRemindersChannel)
 
             Log.d(tag, "✅ Všechny notifikační kanály vytvořeny (včetně monthly_reminders)")
         }
+    }
+
+    // ✨ UPRAVENO: Nastavení master settings - skrývá celou sekci pro běžné uživatele
+    private fun setupMasterSettings(navView: NavigationView) {
+        val user = Firebase.auth.currentUser
+        val menu = navView.menu
+        val masterSettingsSection = menu.findItem(R.id.master_settings_section)
+
+        if (user == null) {
+            // Pokud není přihlášen, skryj celou sekci
+            masterSettingsSection?.isVisible = false
+            Log.d(tag, "Uživatel není přihlášen, master settings skryty")
+            return
+        }
+
+        db.collection("users").document(user.uid).get()
+            .addOnSuccessListener { document ->
+                val isMaster = document.getString("role") == "master"
+
+                // ✅ Zobraz/skryj celou sekci podle role
+                masterSettingsSection?.isVisible = isMaster
+
+                if (isMaster) {
+                    Log.d(tag, "Master detekován, zobrazuji master settings")
+
+                    // Najdi položku se switchem
+                    val hideProfileItem = menu.findItem(R.id.hide_profile_action)
+
+                    // Získej switch z actionView
+                    val switchView = hideProfileItem?.actionView?.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchHideProfile)
+
+                    if (switchView != null) {
+                        // Načti stav z Firestore
+                        val hideFromList = document.getBoolean("hideFromMasterList") ?: false
+
+                        // Odstraň starý listener (prevence duplicit)
+                        switchView.setOnCheckedChangeListener(null)
+
+                        // Nastav stav
+                        switchView.isChecked = hideFromList
+
+                        // Přidej listener
+                        switchView.setOnCheckedChangeListener { _, isChecked ->
+                            updateHideFromMasterList(user.uid, isChecked)
+                        }
+
+                        Log.d(tag, "✅ Master switch nastaven (hideFromList=$hideFromList)")
+                    } else {
+                        Log.e(tag, "❌ Switch nebyl nalezen v actionView")
+                    }
+                } else {
+                    Log.d(tag, "Běžný uživatel, master settings skryty")
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e(tag, "Chyba při kontrole role uživatele", e)
+                // V případě chyby skryj sekci
+                masterSettingsSection?.isVisible = false
+            }
+    }
+
+    // ✨ METODA ZŮSTÁVÁ STEJNÁ: Uložit nastavení hideFromMasterList do Firestore
+    private fun updateHideFromMasterList(userId: String, hide: Boolean) {
+        db.collection("users").document(userId)
+            .update("hideFromMasterList", hide)
+            .addOnSuccessListener {
+                val message = if (hide) {
+                    "Váš profil je nyní skrytý"
+                } else {
+                    "Váš profil je nyní viditelný"
+                }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                Log.d(tag, "✅ hideFromMasterList aktualizováno na: $hide")
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Chyba při aktualizaci nastavení", Toast.LENGTH_SHORT).show()
+                Log.e(tag, "❌ Chyba při ukládání hideFromMasterList", e)
+            }
     }
 
     private fun copyImageToInternalStorage(userId: String, sourceUri: Uri): String? {
@@ -451,6 +529,10 @@ class MainActivity : AppCompatActivity() {
                 R.id.mainFragment, R.id.masterUserListFragment -> {
                     navigateHome()
                     return@setNavigationItemSelectedListener true
+                }
+                R.id.hide_profile_action -> {
+                    // Kliknutí na položku "Skrýt profil" - nic nedělat, Switch se ovládá sám
+                    return@setNavigationItemSelectedListener false
                 }
                 else -> {
                     return@setNavigationItemSelectedListener menuItem.onNavDestinationSelected(navController)

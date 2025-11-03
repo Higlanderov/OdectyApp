@@ -1,11 +1,11 @@
 package cz.davidfryda.odectyapp.ui.main
 
-import android.util.Log // Import pro logování
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.PopupMenu // Import PopupMenu
-import android.widget.Toast // Import Toast
+import android.widget.PopupMenu
+import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
@@ -14,7 +14,7 @@ import androidx.recyclerview.widget.RecyclerView
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.ListItemMeterBinding
-import cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragmentDirections // Import pro Master navigaci
+import cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragmentDirections
 
 /**
  * Listener pro interakce s položkou měřáku v RecyclerView.
@@ -30,13 +30,17 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
 
     // ID uživatele, jehož měřáky zobrazujeme (null pro přihlášeného uživatele, ID pro mastera)
     var ownerId: String? = null
+
+    // ✨ NOVÝ: Příznak, zda master prohlíží svůj vlastní profil
+    var isMasterOwnProfile: Boolean = false
+
     // Listener pro komunikaci s fragmentem
     var listener: MeterInteractionListener? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MeterViewHolder {
         val binding = ListItemMeterBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        // Předáme listener a ownerId do ViewHolderu
-        return MeterViewHolder(binding, listener, ownerId)
+        // Předáme listener, ownerId a isMasterOwnProfile do ViewHolderu
+        return MeterViewHolder(binding, listener, ownerId, isMasterOwnProfile)
     }
 
     override fun onBindViewHolder(holder: MeterViewHolder, position: Int) {
@@ -46,7 +50,8 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
     class MeterViewHolder(
         private val binding: ListItemMeterBinding,
         private val listener: MeterInteractionListener?,
-        private val ownerId: String? // ViewHolder si pamatuje, v jakém je režimu a ID vlastníka
+        private val ownerId: String?, // ViewHolder si pamatuje, v jakém je režimu a ID vlastníka
+        private val isMasterOwnProfile: Boolean // ✨ NOVÉ: Příznak vlastního profilu
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private lateinit var currentMeter: Meter // Uchováme si aktuální měřák pro listenery
@@ -69,15 +74,22 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
             // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
             // Rozlišení master vs. běžný uživatel pro zobrazení názvů
             if (ownerId != null) { // Master režim
-                binding.meterName.text = meter.masterDescription ?: meter.name // Priorita je popis od mastera
-                // Zobrazíme původní název, jen pokud masterDescription existuje A liší se od původního názvu
-                if (meter.masterDescription != null && meter.masterDescription != meter.name) {
-                    binding.originalMeterName.text = itemView.context.getString(R.string.original_meter_name_label, meter.name) // Použití string resource
-                    binding.originalMeterName.isVisible = true // Zobrazíme původní název
+                // ✨ NOVÉ: Pokud master prohlíží svůj vlastní profil, zobrazí se název jako běžnému uživateli
+                if (isMasterOwnProfile) {
+                    binding.meterName.text = meter.name // Jen název
+                    binding.originalMeterName.isVisible = false
                 } else {
-                    binding.originalMeterName.isVisible = false // Skryjeme původní název
+                    // Master prohlíží cizí profil
+                    binding.meterName.text = meter.masterDescription ?: meter.name // Priorita je popis od mastera
+                    // Zobrazíme původní název, jen pokud masterDescription existuje A liší se od původního názvu
+                    if (meter.masterDescription != null && meter.masterDescription != meter.name) {
+                        binding.originalMeterName.text = itemView.context.getString(R.string.original_meter_name_label, meter.name)
+                        binding.originalMeterName.isVisible = true
+                    } else {
+                        binding.originalMeterName.isVisible = false
+                    }
                 }
-                binding.meterOptionsMenuButton.isVisible = true // Master může vždy přidat popis
+                binding.meterOptionsMenuButton.isVisible = true // Master může vždy přidat popis nebo upravit své měřáky
             } else { // Běžný uživatelský režim
                 binding.meterName.text = meter.name // Zobrazíme jen název měřáku
                 binding.originalMeterName.isVisible = false // Skryjeme TextView pro původní název
@@ -112,7 +124,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                             return@setOnClickListener
                         }
 
-                        Log.d("MeterAdapter", "Navigating from MasterUserDetail to MeterDetail (meterId: ${meter.id}, userId: $ownerId)")
+                        Log.d("MeterAdapter", "Navigating from MasterUserDetail to MeterDetail (meterId: ${meter.id}, userId: $ownerId, isMasterOwnProfile: $isMasterOwnProfile)")
                         val action = MasterUserDetailFragmentDirections
                             .actionMasterUserDetailFragmentToMeterDetailFragment(
                                 meterId = meter.id,
@@ -143,19 +155,39 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
         }
 
         /**
-         * Zobrazí vyskakovací menu s příslušnými akcemi podle režimu (master/uživatel).
+         * Zobrazí vyskakovací menu s příslušnými akcemi podle režimu (master/uživatel/master vlastní profil).
          * @param view Pohled (ImageButton), ke kterému se menu ukotví.
          */
         private fun showPopupMenu(view: View) {
             val popup = PopupMenu(view.context, view)
-            if (ownerId != null) { // Master režim
-                Log.d("MeterAdapter", "Showing master menu for meter: ${currentMeter.id}")
-                // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
+
+            // ✨ NOVÉ: Rozlišení podle toho, jestli je to vlastní profil mastera
+            if (ownerId != null && isMasterOwnProfile) {
+                // Master prohlíží svůj vlastní profil = plná práva jako běžný uživatel
+                Log.d("MeterAdapter", "Showing user menu for master's own meter: ${currentMeter.id}")
+                popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)
+                popup.setOnMenuItemClickListener { item ->
+                    when (item.itemId) {
+                        R.id.action_edit_meter -> {
+                            Log.d("MeterAdapter", "Edit meter clicked for master's own meter: ${currentMeter.id}")
+                            listener?.onEditMeterClicked(currentMeter)
+                            true
+                        }
+                        R.id.action_delete_meter -> {
+                            Log.d("MeterAdapter", "Delete meter clicked for master's own meter: ${currentMeter.id}")
+                            listener?.onDeleteMeterClicked(currentMeter)
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            } else if (ownerId != null) {
+                // Master prohlíží cizí profil = jen přidat/upravit popis
+                Log.d("MeterAdapter", "Showing master menu for other user's meter: ${currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.master_meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_add_description -> {
-                            // Zavoláme listener s ID uživatele, kterému měřák patří
                             Log.d("MeterAdapter", "Add description clicked for meter: ${currentMeter.id}, owner: $ownerId")
                             listener?.onAddDescriptionClicked(currentMeter, ownerId)
                             true
@@ -163,8 +195,8 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                         else -> false
                     }
                 }
-                // --- KONEC UPRAVENÉ ČÁSTI ---
-            } else { // Běžný uživatelský režim
+            } else {
+                // Běžný uživatelský režim
                 Log.d("MeterAdapter", "Showing user menu for meter: ${currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->

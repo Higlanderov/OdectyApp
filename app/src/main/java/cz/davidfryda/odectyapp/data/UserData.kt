@@ -11,9 +11,11 @@ data class UserData(
     val phoneNumber: String = "",
     val email: String = "",
     val note: String = "",
+    val role: String = "user",
 
     @get:PropertyName("isDisabled")
     val isDisabled: Boolean = false,
+    val hideFromMasterList: Boolean = false,
     val createdAt: Timestamp? = null
 )
 

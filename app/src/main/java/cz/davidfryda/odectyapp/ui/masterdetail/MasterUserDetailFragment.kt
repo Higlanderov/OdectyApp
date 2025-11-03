@@ -8,6 +8,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -17,6 +19,8 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.navArgs
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.FragmentMasterUserDetailBinding
@@ -27,7 +31,7 @@ import cz.davidfryda.odectyapp.ui.user.SaveResult
 
 /**
  * Fragment zobrazující seznam měřáků pro konkrétního uživatele v režimu správce.
- * Umožňuje správci přidávat/upravovat popisy k měřákům.
+ * Pokud master prohlíží svůj vlastní profil, může přidávat měřáky jako běžný uživatel.
  */
 class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
     private var _binding: FragmentMasterUserDetailBinding? = null
@@ -40,9 +44,13 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
     private val handler = Handler(Looper.getMainLooper())
     private val tag = "MasterUserDetailFrag"
 
+    // ✨ NOVÉ: Zjistíme, jestli master prohlíží svůj vlastní profil
+    private val isOwnProfile: Boolean
+        get() = args.userId == Firebase.auth.currentUser?.uid
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentMasterUserDetailBinding.inflate(inflater, container, false)
-        Log.d(tag, "onCreateView called for user: ${args.userId}")
+        Log.d(tag, "onCreateView called for user: ${args.userId}, isOwnProfile: $isOwnProfile")
         return binding.root
     }
 
@@ -50,32 +58,39 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
         super.onViewCreated(view, savedInstanceState)
         Log.d(tag, "onViewCreated called")
 
-        // ✨ Nastavit default title okamžitě
         activity?.title = getString(R.string.master_user_detail_default_title)
         Log.d(tag, "Default title set")
 
         setupRecyclerView()
 
+        // ✨ NOVÉ: FAB viditelný pouze pro vlastní profil
+        binding.fabAddMeter.isVisible = isOwnProfile
+        binding.fabAddMeter.setOnClickListener {
+            if (isOwnProfile) {
+                showAddMeterDialog()
+            }
+        }
+
         binding.progressBar.isVisible = true
         binding.emptyView.isVisible = false
 
-        // ✨ DŮLEŽITÉ: Nejdřív nastavit observer, PAK zavolat fetch
         viewModel.userName.observe(viewLifecycleOwner) { name ->
             Log.d(tag, "userName observer triggered with value: '$name'")
             if (!name.isNullOrEmpty()) {
-                val newTitle = getString(R.string.master_user_meters_title, name)
+                val newTitle = if (isOwnProfile) {
+                    "Moje měřáky" // ✨ Vlastní profil = "Moje měřáky"
+                } else {
+                    getString(R.string.master_user_meters_title, name) // Cizí profil = "Měřáky: Jméno"
+                }
 
-                // ✨ Nastavit okamžitě
                 activity?.title = newTitle
-                Log.d(tag, "Title bar updated immediately to: '$newTitle'")
+                Log.d(tag, "Title bar updated to: '$newTitle'")
 
-                // ✨ Vynutit refresh toolbar
                 (activity as? androidx.appcompat.app.AppCompatActivity)?.supportActionBar?.let { actionBar ->
                     actionBar.title = newTitle
                     Log.d(tag, "ActionBar title set directly to: '$newTitle'")
                 }
 
-                // ✨ A ještě jednou s malým zpožděním pro jistotu
                 view.postDelayed({
                     activity?.title = newTitle
                     (activity as? androidx.appcompat.app.AppCompatActivity)?.supportActionBar?.title = newTitle
@@ -86,7 +101,6 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
             }
         }
 
-        // ✨ Teď zavoláme fetch (observer už je připravený)
         Log.d(tag, "Calling fetchMetersForUser for userId: ${args.userId}")
         viewModel.fetchMetersForUser(args.userId)
 
@@ -94,8 +108,37 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
             Log.d(tag, "Meters LiveData updated with ${meters.size} items.")
             binding.progressBar.isVisible = false
             meterAdapter.submitList(meters)
+
+            // ✨ NOVÉ: Upravená prázdná zpráva podle režimu
+            if (meters.isEmpty()) {
+                binding.emptyView.text = if (isOwnProfile) {
+                    "Zatím nemáte žádné měřáky.\nKlikněte na + pro přidání."
+                } else {
+                    "Tento uživatel zatím nemá žádné měřáky."
+                }
+            }
             binding.emptyView.isVisible = meters.isEmpty()
             Log.d(tag, "RecyclerView updated. Empty view visible: ${meters.isEmpty()}")
+        }
+
+        // ✨ NOVÉ: Sledování výsledků přidání měřáku (jen pro vlastní profil)
+        if (isOwnProfile) {
+            viewModel.addResult.observe(viewLifecycleOwner) { result ->
+                binding.progressBar.isVisible = result is SaveResult.Loading
+                binding.fabAddMeter.isEnabled = result !is SaveResult.Loading
+
+                when (result) {
+                    is SaveResult.Success -> {
+                        showSuccessDialog("Měřák úspěšně přidán.")
+                        viewModel.resetAddResult()
+                    }
+                    is SaveResult.Error -> {
+                        Toast.makeText(context, "Chyba při přidávání: ${result.message}", Toast.LENGTH_LONG).show()
+                        viewModel.resetAddResult()
+                    }
+                    else -> { /* Idle nebo Loading */ }
+                }
+            }
         }
 
         viewModel.saveDescriptionResult.observe(viewLifecycleOwner) { result ->
@@ -129,22 +172,118 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
         meterAdapter = MeterAdapter()
         meterAdapter.ownerId = args.userId
         meterAdapter.listener = this
+        meterAdapter.isMasterOwnProfile = isOwnProfile // ✨ NOVÝ parametr
         binding.usersRecyclerView.adapter = meterAdapter
     }
 
+    // ✨ NOVÉ: Dialog pro přidání měřáku (jen pro vlastní profil)
+    private fun showAddMeterDialog() {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_meter, null)
+        val editText = dialogView.findViewById<EditText>(R.id.meterNameEditText)
+        val radioGroup = dialogView.findViewById<RadioGroup>(R.id.meterTypeRadioGroup)
+        val saveButton = dialogView.findViewById<Button>(R.id.dialogSaveButton)
+        val cancelButton = dialogView.findViewById<Button>(R.id.dialogCancelButton)
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Přidat nový měřák")
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        saveButton.setOnClickListener {
+            val name = editText.text.toString().trim()
+            val selectedTypeId = radioGroup.checkedRadioButtonId
+
+            if (name.isNotEmpty() && selectedTypeId != -1) {
+                val type = when (selectedTypeId) {
+                    R.id.radioElectricity -> "Elektřina"
+                    R.id.radioGas -> "Plyn"
+                    R.id.radioWater -> "Voda"
+                    else -> "Obecný"
+                }
+                viewModel.addMeter(name, type, args.userId)
+                dialog.dismiss()
+            } else {
+                Toast.makeText(context, "Vyplňte prosím název a typ měřáku.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        cancelButton.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
     override fun onEditMeterClicked(meter: Meter) {
-        Log.d(tag, "onEditMeterClicked called (no action in master mode)")
-        Toast.makeText(context, "Úprava názvu je dostupná pouze pro vlastní měřáky.", Toast.LENGTH_SHORT).show()
+        // ✨ NOVÉ: Povolit jen pro vlastní profil
+        if (isOwnProfile) {
+            showEditMeterDialog(meter)
+        } else {
+            Log.d(tag, "onEditMeterClicked called (no action - not own profile)")
+            Toast.makeText(context, "Úprava názvu je dostupná pouze pro vlastní měřáky.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDeleteMeterClicked(meter: Meter) {
-        Log.d(tag, "onDeleteMeterClicked called (no action in master mode)")
-        Toast.makeText(context, "Mazání měřáku je dostupné pouze pro vlastní měřáky.", Toast.LENGTH_SHORT).show()
+        // ✨ NOVÉ: Povolit jen pro vlastní profil
+        if (isOwnProfile) {
+            showDeleteConfirmationDialog(meter)
+        } else {
+            Log.d(tag, "onDeleteMeterClicked called (no action - not own profile)")
+            Toast.makeText(context, "Mazání měřáku je dostupné pouze pro vlastní měřáky.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onAddDescriptionClicked(meter: Meter, ownerUserId: String) {
         Log.d(tag, "onAddDescriptionClicked called for meter: ${meter.id}")
         showAddDescriptionDialog(meter, ownerUserId)
+    }
+
+    // ✨ NOVÉ: Dialog pro úpravu názvu
+    private fun showEditMeterDialog(meter: Meter) {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_meter, null)
+        val editText = dialogView.findViewById<TextInputEditText>(R.id.editMeterNameEditText)
+        val saveButton = dialogView.findViewById<Button>(R.id.dialogSaveButton)
+        val cancelButton = dialogView.findViewById<Button>(R.id.dialogCancelButton)
+
+        editText.setText(meter.name)
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Upravit název měřáku")
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        saveButton.setOnClickListener {
+            val newName = editText.text.toString().trim()
+            if (newName.isNotEmpty() && newName != meter.name) {
+                viewModel.updateMeterName(meter.id, newName, args.userId)
+                dialog.dismiss()
+            } else if (newName.isEmpty()) {
+                Toast.makeText(context, "Název měřáku nemůže být prázdný.", Toast.LENGTH_SHORT).show()
+            } else {
+                dialog.dismiss()
+            }
+        }
+
+        cancelButton.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    // ✨ NOVÉ: Dialog pro potvrzení smazání
+    private fun showDeleteConfirmationDialog(meter: Meter) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Smazat měřák")
+            .setMessage("Opravdu chcete smazat měřák '${meter.name}' včetně všech jeho odečtů a fotografií? Tato akce je nevratná.")
+            .setNegativeButton("Zrušit", null)
+            .setPositiveButton("Smazat") { _, _ ->
+                viewModel.deleteMeter(meter.id, args.userId)
+            }
+            .show()
     }
 
     private fun showAddDescriptionDialog(meter: Meter, ownerUserId: String) {
@@ -215,12 +354,12 @@ class MasterUserDetailFragment : Fragment(), MeterInteractionListener {
                 Log.d(tag, "Dismissing success dialog.")
                 successDialog?.dismiss()
             } catch (e: Exception) {
-                Log.w(tag, "Error dismissing success dialog (might be expected during rapid navigation): ${e.message}")
+                Log.w(tag, "Error dismissing success dialog: ${e.message}")
             } finally {
                 successDialog = null
             }
         } else if (successDialog != null) {
-            Log.d(tag, "Success dialog exists but not dismissing (showing=${successDialog?.isShowing}, isAdded=$isAdded). Setting reference to null.")
+            Log.d(tag, "Success dialog exists but not dismissing. Setting reference to null.")
             successDialog = null
         }
     }

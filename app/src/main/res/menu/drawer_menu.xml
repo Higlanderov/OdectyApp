@@ -1,23 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
     <group android:checkableBehavior="single">
-        <!-- ID se musí shodovat s ID fragmentu v nav_graph.xml -->
         <item
             android:id="@+id/mainFragment"
             android:icon="@drawable/ic_home"
-            android:title="Domů" />
+            android:title="@string/home" />
         <item
             android:id="@+id/profileFragment"
             android:icon="@drawable/ic_profile"
-            android:title="Profil" />
+            android:title="@string/profile" />
     </group>
 
-    <item android:title="Účet">
+    <!-- ✨ NOVÁ SEKCE: Nastavení správce (s ID pro skupinu) -->
+    <item
+        android:id="@+id/master_settings_section"
+        android:title="@string/admin_settings"
+        android:visible="false">
+        <menu>
+            <item
+                android:id="@+id/hide_profile_action"
+                android:icon="@drawable/ic_visibility_off"
+                android:title="@string/hide_my_profile"
+                app:actionLayout="@layout/switch_only" />
+        </menu>
+    </item>
+
+    <item android:title="@string/account">
         <menu>
             <item
                 android:id="@+id/logout_action"
                 android:icon="@drawable/ic_logout"
-                android:title="Odhlásit se" />
+                android:title="@string/logout" />
         </menu>
     </item>
+
 </menu>

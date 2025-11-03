@@ -21,7 +21,7 @@
         android:id="@+id/emptyChartText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Pro zobrazení grafu je potřeba alespoň jeden odečet."
+        android:text="@string/empty_chart_text"
         android:textAppearance="?attr/textAppearanceBodyLarge"
         android:textAlignment="center"
         android:visibility="gone"
