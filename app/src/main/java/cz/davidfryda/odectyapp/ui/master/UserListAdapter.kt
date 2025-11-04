@@ -1,82 +1,89 @@
 package cz.davidfryda.odectyapp.ui.master
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
-import androidx.core.content.ContextCompat
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.core.view.isVisible
-import androidx.navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import cz.davidfryda.odectyapp.R
-import cz.davidfryda.odectyapp.databinding.ListItemUserBinding
-import java.util.concurrent.TimeUnit
 
-class UserListAdapter : ListAdapter<UserWithStatus, UserListAdapter.UserViewHolder>(UserWithStatusDiffCallback()) {
+class UserListAdapter : ListAdapter<UserWithStatus, UserListAdapter.UserViewHolder>(UserDiffCallback()) {
+
+    // Callbacky
+    private var onUserClickListener: ((UserWithStatus) -> Unit)? = null
+    private var onInfoClickListener: ((UserWithStatus) -> Unit)? = null
+
+    fun setOnUserClickListener(listener: (UserWithStatus) -> Unit) {
+        onUserClickListener = listener
+    }
+
+    fun setOnInfoClickListener(listener: (UserWithStatus) -> Unit) {
+        onInfoClickListener = listener
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
-        val binding = ListItemUserBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return UserViewHolder(binding)
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.list_item_user, parent, false)
+        return UserViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: UserViewHolder, position: Int) {
-        holder.bind(getItem(position))
+        val item = getItem(position)
+        holder.bind(item)
+
+        // Kliknutí na celou kartu
+        holder.itemView.setOnClickListener {
+            onUserClickListener?.invoke(item)
+        }
+
+        // Kliknutí na info button
+        holder.infoButton.setOnClickListener {
+            onInfoClickListener?.invoke(item)
+        }
     }
 
-    class UserViewHolder(private val binding: ListItemUserBinding) : RecyclerView.ViewHolder(binding.root) {
-
-        private val infoButton: ImageButton = binding.infoButton
+    class UserViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val userName: TextView = itemView.findViewById(R.id.userName)
+        private val userAddress: TextView = itemView.findViewById(R.id.userAddress)
+        private val statusTextView: TextView = itemView.findViewById(R.id.statusTextView)
+        private val blockedIcon: ImageView = itemView.findViewById(R.id.blockedIcon)
+        val infoButton: ImageButton = itemView.findViewById(R.id.infoButton)
 
         fun bind(userWithStatus: UserWithStatus) {
             val user = userWithStatus.user
-            binding.userName.text = itemView.context.getString(R.string.user_full_name, user.name, user.surname)
-            binding.userAddress.text = user.address
+            userName.text = "${user.name} ${user.surname}"
+            userAddress.text = user.address
 
-            // ✨ Zobrazit hvězdičku pro nové uživatele (prvních 48 hodin od vytvoření účtu)
-            val isNewUser = user.createdAt?.let { timestamp ->
-                val creationTime = timestamp.toDate().time
-                val currentTime = System.currentTimeMillis()
-                val hoursSinceCreation = TimeUnit.MILLISECONDS.toHours(currentTime - creationTime)
-                hoursSinceCreation < 48
-            } ?: false
+            // Zobrazení ikony zablokovaného uživatele
+            blockedIcon.isVisible = user.isDisabled
 
-            binding.newUserIcon.isVisible = isNewUser
-
-            // ✨ NOVÉ: Zobrazit ikonu zámku pro zablokované uživatele
-            binding.blockedIcon.isVisible = user.isDisabled
-
-            // KLÍČOVÁ LOGIKA: Nastavení barvy karty
-            val backgroundColor = if (userWithStatus.hasReadingForCurrentMonth) {
-                ContextCompat.getColor(itemView.context, R.color.status_ok)
+            // Nastavení statusu odečtu
+            if (userWithStatus.hasReadingForCurrentMonth) {
+                statusTextView.text = "✓ Provedeno"
+                statusTextView.setTextColor(
+                    itemView.context.getColor(android.R.color.holo_green_dark)
+                )
             } else {
-                ContextCompat.getColor(itemView.context, R.color.status_pending)
-            }
-            (itemView as com.google.android.material.card.MaterialCardView).setCardBackgroundColor(backgroundColor)
-
-            // Kliknutí na CELOU KARTU stále vede do seznamu měřáků
-            itemView.setOnClickListener {
-                val action = MasterUserListFragmentDirections.actionMasterUserListFragmentToMasterUserDetailFragment(user.uid)
-                itemView.findNavController().navigate(action)
-            }
-
-            // Listener pro Info tlačítko
-            infoButton.setOnClickListener {
-                // Navigace na nový UserDetailFragment
-                val action = MasterUserListFragmentDirections.actionMasterUserListFragmentToUserDetailFragment(user.uid)
-                itemView.findNavController().navigate(action)
+                statusTextView.text = "⏳ Čekající"
+                statusTextView.setTextColor(
+                    itemView.context.getColor(android.R.color.holo_orange_dark)
+                )
             }
         }
     }
-}
 
-// DiffUtil zůstává stejný
-class UserWithStatusDiffCallback : DiffUtil.ItemCallback<UserWithStatus>() {
-    override fun areItemsTheSame(oldItem: UserWithStatus, newItem: UserWithStatus): Boolean {
-        return oldItem.user.uid == newItem.user.uid
-    }
+    class UserDiffCallback : DiffUtil.ItemCallback<UserWithStatus>() {
+        override fun areItemsTheSame(oldItem: UserWithStatus, newItem: UserWithStatus): Boolean {
+            return oldItem.user.uid == newItem.user.uid
+        }
 
-    override fun areContentsTheSame(oldItem: UserWithStatus, newItem: UserWithStatus): Boolean {
-        return oldItem == newItem
+        override fun areContentsTheSame(oldItem: UserWithStatus, newItem: UserWithStatus): Boolean {
+            return oldItem == newItem
+        }
     }
 }

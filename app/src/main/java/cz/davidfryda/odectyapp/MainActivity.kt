@@ -62,7 +62,7 @@ import java.util.concurrent.TimeUnit
 @ExperimentalBadgeUtils
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var appBarConfiguration: AppBarConfiguration
+    internal lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var navController: NavController
     private lateinit var auth: FirebaseAuth
 
@@ -169,7 +169,7 @@ class MainActivity : AppCompatActivity() {
 
         appBarConfiguration = AppBarConfiguration(
             setOf(
-                R.id.mainFragment, R.id.masterUserListFragment
+                R.id.mainFragment, R.id.masterUserListFragment, R.id.locationListFragment
             ), drawerLayout
         )
         setupActionBarWithNavController(navController, appBarConfiguration)

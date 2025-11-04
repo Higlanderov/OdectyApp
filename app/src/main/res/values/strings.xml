@@ -136,7 +136,83 @@
     <string name="login_register_prompt">Ještě nemáte účet? Zaregistrujte se</string>
     <string name="login_google_sign_in">Přihlásit se přes Google</string>
     <string name="user_detail_button_description">Zobrazit detail uživatele</string>
-
+    <!-- Location strings -->
+    <string name="locations">Odběrná místa</string>
+    <string name="add_location">Přidat odběrné místo</string>
+    <string name="no_locations">Žádná odběrná místa</string>
+    <string name="no_locations_yet">Zatím nemáte žádná odběrná místa</string>
+    <string name="add_first_location">Přidejte první odběrné místo pro správu měřáků</string>
+    <string name="location_icon">Ikona místa</string>
+    <string name="address_icon">Ikona adresy</string>
+    <string name="meters_icon">Ikona měřáků</string>
+    <string name="default_location">Výchozí</string>
+    <string name="no_meters">Žádné měřáky</string>
+    <string name="meter">měřák</string>
+    <string name="meters">měřáky</string>
+    <string name="set_as_default">Nastavit jako výchozí</string>
+    <string name="delete_location_title">Smazat odběrné místo?</string>
+    <string name="delete_location_message">Opravdu chcete smazat místo \"%1$s\"? Tuto akci nelze vrátit zpět.</string>
+    <string name="location_deleted">Místo smazáno</string>
+    <string name="default_location_updated">Výchozí místo aktualizováno</string>
+    <!-- Add Location strings -->
+    <string name="add_new_location">Nové odběrné místo</string>
+    <string name="location_name">Název místa</string>
+    <string name="location_name_helper">Např. Hlavní bydliště, Chata, Garáž</string>
+    <string name="location_name_required">Název místa je povinný</string>
+    <string name="address_required">Adresa je povinná</string>
+    <string name="address_helper">Např. Hlavní 123, Praha 1</string>
+    <string name="note_optional">Poznámka (volitelné)</string>
+    <string name="note_helper">Např. Rodinný dům, 3. patro</string>
+    <string name="set_as_default_location">Nastavit jako výchozí místo</string>
+    <string name="default_location_description">Výchozí místo se použije pro nové měřáky</string>
+    <string name="default_location_icon">Ikona výchozího místa</string>
+    <string name="info_icon">Ikona informace</string>
+    <string name="add_location_info">Po vytvoření odběrného místa k němu můžete přidat měřáky. Každý měřák musí být přiřazen k jednomu odběrnému místu.</string>
+    <string name="location_added_successfully">Odběrné místo přidáno</string>
+    <!-- Edit Location strings -->
+    <string name="edit_location">Upravit odběrné místo</string>
+    <string name="loading_location">Načítání místa…</string>
+    <string name="error_loading_location">Chyba při načítání místa</string>
+    <string name="location_updated_successfully">Odběrné místo aktualizováno</string>
+    <string name="location_has_one_meter">Toto místo má 1 měřák</string>
+    <string name="location_has_meters">Toto místo má %1$d měřáky</string>
+    <!-- Location Detail strings -->
+    <string name="meters_on_this_location">Měřáky na tomto místě</string>
+    <string name="no_meters_on_location">Žádné měřáky na tomto místě</string>
+    <string name="add_first_meter_to_location">Přidejte první měřák pro toto odběrné místo</string>
+    <string name="note_icon">Ikona poznámky</string>
+    <!-- Navigation strings -->
+    <string name="location_detail">Detail místa</string>
+    <!-- Chybějící strings -->
+    <string name="address">Adresa</string>
+    <string name="edit">Upravit</string>
+    <string name="more_options">Více možností</string>
+    <!-- Add Meter strings -->
+    <string name="add_new_meter">Nový měřák</string>
+    <string name="meter_icon">Ikona měřáku</string>
+    <string name="location">Odběrné místo</string>
+    <string name="location_helper">Vyberte místo, kde se měřák nachází</string>
+    <string name="location_required">Odběrné místo je povinné</string>
+    <string name="meter_name">Název měřáku</string>
+    <string name="meter_name_helper">Např. Elektroměr v přízemí</string>
+    <string name="meter_name_required">Název měřáku je povinný</string>
+    <string name="meter_type">Typ měřáku</string>
+    <string name="meter_type_helper">Vyberte typ měřáku</string>
+    <string name="meter_type_required">Typ měřáku je povinný</string>
+    <string name="add_meter_info">Měřák bude přiřazen k vybranému odběrnému místu. Později můžete měřák přesunout na jiné místo.</string>
+    <string name="meter_added_successfully">Měřák přidán</string>
+    <string name="no_locations_create_first">Nejdřív vytvořte odběrné místo</string>
+    <string name="edit_meter">Upravit měřák</string>
+    <!-- Meter strings -->
+    <string name="delete_meter">Smazat měřák</string>
+    <string name="delete_meter_title">Smazat měřák?</string>
+    <string name="delete_meter_message">Opravdu chcete smazat měřák \"%1$s\"? Budou smazány i všechny odečty tohoto měřáku.</string>
+    <string name="meter_deleted">Měřák smazán</string>
+    <!-- Edit Meter strings -->
+    <string name="edit_meter_info">Můžete změnit název, typ i odběrné místo měřáku. Historie odečtů zůstane zachována.</string>
+    <string name="meter_updated_successfully">Měřák aktualizován</string>
+    <string name="error_loading_meter">Chyba při načítání měřáku</string>
+    <string name="loading">Načítání</string>
 
     <string-array name="months_array">
         <item>Leden</item>

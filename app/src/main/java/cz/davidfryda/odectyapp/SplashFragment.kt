@@ -29,7 +29,7 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
                     if (isMaster) {
                         findNavController().navigate(R.id.action_splashFragment_to_masterUserListFragment)
                     } else {
-                        findNavController().navigate(R.id.action_splashFragment_to_mainFragment)
+                        findNavController().navigate(R.id.action_splashFragment_to_locationListFragment)
                     }
                 } catch (_: Exception) {
                     findNavController().navigate(R.id.action_splashFragment_to_loginFragment)

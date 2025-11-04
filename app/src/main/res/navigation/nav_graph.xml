@@ -27,6 +27,7 @@
             android:id="@+id/action_loginFragment_to_userInfoFragment"
             app:destination="@id/userInfoFragment" />
     </fragment>
+
     <fragment
         android:id="@+id/registerFragment"
         android:name="cz.davidfryda.odectyapp.ui.auth.RegisterFragment"
@@ -51,6 +52,7 @@
             app:popUpTo="@id/nav_graph"
             app:popUpToInclusive="true" />
     </fragment>
+
     <fragment
         android:id="@+id/splashFragment"
         android:name="cz.davidfryda.odectyapp.SplashFragment"
@@ -62,16 +64,18 @@
             app:popUpTo="@id/splashFragment"
             app:popUpToInclusive="true" />
         <action
-            android:id="@+id/action_splashFragment_to_mainFragment"
-            app:destination="@id/mainFragment"
-            app:popUpTo="@id/splashFragment"
-            app:popUpToInclusive="true" />
-        <action
             android:id="@+id/action_splashFragment_to_masterUserListFragment"
             app:destination="@id/masterUserListFragment"
             app:popUpTo="@id/splashFragment"
             app:popUpToInclusive="true" />
+        <!-- ✨ NOVÁ akce pro běžného uživatele -->
+        <action
+            android:id="@+id/action_splashFragment_to_locationListFragment"
+            app:destination="@id/locationListFragment"
+            app:popUpTo="@id/splashFragment"
+            app:popUpToInclusive="true" />
     </fragment>
+
     <fragment
         android:id="@+id/userInfoFragment"
         android:name="cz.davidfryda.odectyapp.ui.user.UserInfoFragment"
@@ -83,6 +87,7 @@
             app:popUpTo="@id/nav_graph"
             app:popUpToInclusive="true" />
     </fragment>
+
     <fragment
         android:id="@+id/mainFragment"
         android:name="cz.davidfryda.odectyapp.ui.main.MainFragment"
@@ -91,7 +96,15 @@
         <action
             android:id="@+id/action_mainFragment_to_meterDetailFragment"
             app:destination="@id/meterDetailFragment" />
+        <action
+            android:id="@+id/action_mainFragment_to_locationListFragment"
+            app:destination="@id/locationListFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
+
     <fragment
         android:id="@+id/meterDetailFragment"
         android:name="cz.davidfryda.odectyapp.ui.main.MeterDetailFragment"
@@ -100,18 +113,19 @@
         <argument
             android:name="meterId"
             app:argType="string" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
         <action
             android:id="@+id/action_meterDetailFragment_to_chartFragment"
             app:destination="@id/chartFragment" />
         <action
             android:id="@+id/action_meterDetailFragment_to_readingDetailFragment"
             app:destination="@id/readingDetailFragment" />
-        <argument
-            android:name="userId"
-            app:argType="string"
-            app:nullable="true"
-            android:defaultValue="@null" />
     </fragment>
+
     <fragment
         android:id="@+id/chartFragment"
         android:name="cz.davidfryda.odectyapp.ui.main.ChartFragment"
@@ -126,6 +140,7 @@
             app:nullable="true"
             android:defaultValue="@null" />
     </fragment>
+
     <fragment
         android:id="@+id/readingDetailFragment"
         android:name="cz.davidfryda.odectyapp.ui.main.ReadingDetailFragment"
@@ -143,15 +158,21 @@
             app:argType="boolean"
             android:defaultValue="false" />
     </fragment>
+
     <action android:id="@+id/action_global_splashFragment"
         app:destination="@id/splashFragment"
         app:popUpTo="@id/nav_graph"
         app:popUpToInclusive="true"/>
+
     <fragment
         android:id="@+id/profileFragment"
         android:name="cz.davidfryda.odectyapp.ui.profile.ProfileFragment"
         android:label="Profil"
         tools:layout="@layout/fragment_profile" />
+
+    <!-- ============================================ -->
+    <!-- MASTER USER LIST FRAGMENT                   -->
+    <!-- ============================================ -->
     <fragment
         android:id="@+id/masterUserListFragment"
         android:name="cz.davidfryda.odectyapp.ui.master.MasterUserListFragment"
@@ -163,7 +184,22 @@
         <action
             android:id="@+id/action_masterUserListFragment_to_userDetailFragment"
             app:destination="@id/userDetailFragment" />
+        <!-- ✨ NOVÁ akce: Navigace na lokace uživatele -->
+        <action
+            android:id="@+id/action_masterUserListFragment_to_locationListFragment"
+            app:destination="@id/locationListFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
     </fragment>
+
     <fragment
         android:id="@+id/masterUserDetailFragment"
         android:name="cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragment"
@@ -175,6 +211,7 @@
             android:id="@+id/action_masterUserDetailFragment_to_meterDetailFragment"
             app:destination="@id/meterDetailFragment" />
     </fragment>
+
     <dialog
         android:id="@+id/notificationListFragment"
         android:name="cz.davidfryda.odectyapp.ui.notifications.NotificationListFragment"
@@ -190,13 +227,13 @@
         <argument
             android:name="userId"
             app:argType="string" />
-
         <action
             android:id="@+id/action_userDetailFragment_to_editUserDetailFragment"
             app:destination="@id/editUserDetailFragment" />
-
     </fragment>
-    <action android:id="@+id/action_global_readingDetailFragment" app:destination="@id/readingDetailFragment"/>
+
+    <action android:id="@+id/action_global_readingDetailFragment"
+        app:destination="@id/readingDetailFragment"/>
 
     <fragment
         android:id="@+id/editUserDetailFragment"
@@ -206,6 +243,237 @@
         <argument
             android:name="userId"
             app:argType="string" />
+    </fragment>
+
+    <!-- ============================================ -->
+    <!-- LOCATION FRAGMENTS                          -->
+    <!-- ============================================ -->
+
+    <!-- Location List Fragment -->
+    <fragment
+        android:id="@+id/locationListFragment"
+        android:name="cz.davidfryda.odectyapp.ui.location.LocationListFragment"
+        android:label="@string/locations"
+        tools:layout="@layout/fragment_location_list">
+
+        <!-- ✨ Argument pro mastera -->
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+        <action
+            android:id="@+id/action_locationListFragment_to_addLocationFragment"
+            app:destination="@id/addLocationFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+        <action
+            android:id="@+id/action_locationListFragment_to_locationDetailFragment"
+            app:destination="@id/locationDetailFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="locationId"
+                app:argType="string" />
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+        <action
+            android:id="@+id/action_locationListFragment_to_editLocationFragment"
+            app:destination="@id/editLocationFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="locationId"
+                app:argType="string" />
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+    </fragment>
+
+    <!-- Add Location Fragment -->
+    <fragment
+        android:id="@+id/addLocationFragment"
+        android:name="cz.davidfryda.odectyapp.ui.location.AddLocationFragment"
+        android:label="@string/add_location"
+        tools:layout="@layout/fragment_add_location">
+
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+    </fragment>
+
+    <!-- Edit Location Fragment -->
+    <fragment
+        android:id="@+id/editLocationFragment"
+        android:name="cz.davidfryda.odectyapp.ui.location.EditLocationFragment"
+        android:label="@string/edit_location"
+        tools:layout="@layout/fragment_edit_location">
+
+        <argument
+            android:name="locationId"
+            app:argType="string" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+    </fragment>
+
+    <!-- Location Detail Fragment -->
+    <fragment
+        android:id="@+id/locationDetailFragment"
+        android:name="cz.davidfryda.odectyapp.ui.location.LocationDetailFragment"
+        android:label="@string/location_detail"
+        tools:layout="@layout/fragment_location_detail">
+
+        <argument
+            android:name="locationId"
+            app:argType="string" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+        <action
+            android:id="@+id/action_locationDetailFragment_to_editLocationFragment"
+            app:destination="@id/editLocationFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="locationId"
+                app:argType="string" />
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+        <action
+            android:id="@+id/action_locationDetailFragment_to_addMeterFragment"
+            app:destination="@id/addMeterFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="preselectedLocationId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+        <action
+            android:id="@+id/action_locationDetailFragment_to_meterDetailFragment"
+            app:destination="@id/meterDetailFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="meterId"
+                app:argType="string" />
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+        <action
+            android:id="@+id/action_locationDetailFragment_to_editMeterFragment"
+            app:destination="@id/editMeterFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right">
+            <argument
+                android:name="meterId"
+                app:argType="string" />
+            <argument
+                android:name="userId"
+                app:argType="string"
+                app:nullable="true"
+                android:defaultValue="@null" />
+        </action>
+
+    </fragment>
+
+    <!-- ============================================ -->
+    <!-- METER FRAGMENTS                             -->
+    <!-- ============================================ -->
+
+    <!-- Add Meter Fragment -->
+    <fragment
+        android:id="@+id/addMeterFragment"
+        android:name="cz.davidfryda.odectyapp.ui.meter.AddMeterFragment"
+        android:label="@string/add_meter"
+        tools:layout="@layout/fragment_add_meter">
+
+        <argument
+            android:name="preselectedLocationId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
+    </fragment>
+
+    <!-- Edit Meter Fragment -->
+    <fragment
+        android:id="@+id/editMeterFragment"
+        android:name="cz.davidfryda.odectyapp.ui.meter.EditMeterFragment"
+        android:label="@string/edit_meter"
+        tools:layout="@layout/fragment_edit_meter">
+
+        <argument
+            android:name="meterId"
+            app:argType="string" />
+        <argument
+            android:name="userId"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+
     </fragment>
 
 </navigation>

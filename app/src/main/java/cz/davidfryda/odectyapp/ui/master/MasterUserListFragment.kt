@@ -27,6 +27,7 @@ import java.util.Locale
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import android.util.Log
+import androidx.navigation.fragment.findNavController
 
 
 class MasterUserListFragment : Fragment() {
@@ -290,6 +291,21 @@ class MasterUserListFragment : Fragment() {
 
     private fun setupRecyclerView() {
         userAdapter = UserListAdapter()
+
+        // ✨ NOVÉ: Kliknutí na celou kartu → navigace na lokace
+        userAdapter.setOnUserClickListener { userWithStatus ->
+            val action = MasterUserListFragmentDirections
+                .actionMasterUserListFragmentToLocationListFragment(userId = userWithStatus.user.uid)
+            findNavController().navigate(action)
+        }
+
+        // ✨ ZACHOVÁNO: Kliknutí na info button → navigace na detail uživatele
+        userAdapter.setOnInfoClickListener { userWithStatus ->
+            val action = MasterUserListFragmentDirections
+                .actionMasterUserListFragmentToUserDetailFragment(userId = userWithStatus.user.uid)
+            findNavController().navigate(action)
+        }
+
         binding.usersRecyclerView.adapter = userAdapter
     }
 

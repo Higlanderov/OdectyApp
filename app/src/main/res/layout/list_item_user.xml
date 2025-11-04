@@ -46,10 +46,25 @@
             app:layout_constraintTop_toBottomOf="@+id/userName"
             app:layout_constraintStart_toEndOf="@+id/newUserIcon"
             app:layout_constraintEnd_toEndOf="@id/userName"
-            app:layout_constraintBottom_toBottomOf="parent"
             tools:text="Ústí nad Labem" />
 
-        <!-- ✨ NOVÁ: Ikona zámku pro zablokované uživatele -->
+        <!-- ✨ NOVÝ: Status odečtu -->
+        <TextView
+            android:id="@+id/statusTextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginStart="8dp"
+            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            android:textStyle="bold"
+            app:layout_constraintTop_toBottomOf="@+id/userAddress"
+            app:layout_constraintStart_toEndOf="@+id/newUserIcon"
+            app:layout_constraintEnd_toEndOf="@id/userName"
+            app:layout_constraintBottom_toBottomOf="parent"
+            tools:text="✓ Provedeno"
+            tools:textColor="@android:color/holo_green_dark" />
+
+        <!-- Ikona zámku pro zablokované uživatele -->
         <ImageView
             android:id="@+id/blockedIcon"
             android:layout_width="24dp"
