@@ -5,7 +5,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.ktx.auth
+import com.google.firebase.auth.ktx.auth // Ponecháno pro fallback
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -16,6 +16,7 @@ import kotlinx.coroutines.tasks.await
 class LocationListViewModel : ViewModel() {
     private val db = Firebase.firestore
     private val tag = "LocationListViewModel"
+    private val auth = Firebase.auth // Instance pro fallback
 
     private val _locations = MutableLiveData<List<Location>>()
     val locations: LiveData<List<Location>> = _locations
@@ -29,24 +30,38 @@ class LocationListViewModel : ViewModel() {
     private val _setDefaultResult = MutableLiveData<SetDefaultResult>()
     val setDefaultResult: LiveData<SetDefaultResult> = _setDefaultResult
 
-    fun loadLocations() {
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
-            Log.e(tag, "User not logged in")
+    // NOVÉ: Proměnná pro uložení ID uživatele, se kterým pracujeme
+    private var targetUserId: String? = null
+
+    // PŮVODNÍ FUNKCE PŘEPRACOVÁNA
+    /**
+     * Načte lokace buď pro konkrétního uživatele (pokud je předáno userId - režim Master)
+     * nebo pro aktuálně přihlášeného uživatele (pokud je userId null - běžný režim).
+     */
+    fun loadLocationsForUser(userId: String?) {
+        // Klíčová logika: Urči, pro koho se bude načítat
+        val idToQuery = userId ?: auth.currentUser?.uid
+
+        if (idToQuery == null) {
+            Log.e(tag, "Chyba: Uživatel není identifikován (ani z argumentu, ani přihlášen).")
             _locations.value = emptyList()
             return
         }
 
+        // Ulož si ID pro pozdější použití (mazání, nastavení výchozí)
+        this.targetUserId = idToQuery
+        Log.d(tag, "Načítám lokace pro uživatele: $idToQuery")
+
         _isLoading.value = true
 
-        db.collection("users").document(userId).collection("locations")
+        db.collection("users").document(idToQuery).collection("locations")
             .orderBy("isDefault", Query.Direction.DESCENDING)
             .orderBy("createdAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshots, error ->
                 _isLoading.value = false
 
                 if (error != null) {
-                    Log.e(tag, "Error loading locations", error)
+                    Log.e(tag, "Error loading locations for $idToQuery", error)
                     _locations.value = emptyList()
                     return@addSnapshotListener
                 }
@@ -55,17 +70,18 @@ class LocationListViewModel : ViewModel() {
                     doc.toObject(Location::class.java)?.copy(id = doc.id)
                 } ?: emptyList()
 
-                // Pro každou lokaci spočítej počet měřáků
-                loadMeterCounts(userId, locationsList)
+                // Pro každou lokaci spočítej počet měřáků (použij správné ID!)
+                loadMeterCounts(idToQuery, locationsList)
             }
     }
 
+    // UPRAVENO: Používá předané `userId`
     private fun loadMeterCounts(userId: String, locationsList: List<Location>) {
         viewModelScope.launch {
             val locationsWithCounts = locationsList.map { location ->
                 try {
                     val meterCount = db.collection("users")
-                        .document(userId)
+                        .document(userId) // POUŽIJ SPRÁVNÉ ID
                         .collection("meters")
                         .whereEqualTo("locationId", location.id)
                         .get()
@@ -83,9 +99,10 @@ class LocationListViewModel : ViewModel() {
         }
     }
 
+    // UPRAVENO: Používá `targetUserId`
     fun deleteLocation(locationId: String) {
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
+        // val userId = Firebase.auth.currentUser?.uid // TOTO JE ŠPATNĚ
+        if (targetUserId == null) {
             _deleteResult.value = DeleteResult.Error("User not logged in")
             return
         }
@@ -95,7 +112,7 @@ class LocationListViewModel : ViewModel() {
             try {
                 // Zkontroluj, jestli má lokace nějaké měřáky
                 val metersSnapshot = db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!) // POUŽIJ ULOŽENÉ ID
                     .collection("meters")
                     .whereEqualTo("locationId", locationId)
                     .get()
@@ -111,13 +128,13 @@ class LocationListViewModel : ViewModel() {
 
                 // Smaž lokaci
                 db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!) // POUŽIJ ULOŽENÉ ID
                     .collection("locations")
                     .document(locationId)
                     .delete()
                     .await()
 
-                Log.d(tag, "Location $locationId deleted successfully")
+                Log.d(tag, "Location $locationId deleted successfully for user $targetUserId")
                 _deleteResult.value = DeleteResult.Success
                 _isLoading.value = false
 
@@ -129,9 +146,10 @@ class LocationListViewModel : ViewModel() {
         }
     }
 
+    // UPRAVENO: Používá `targetUserId`
     fun setAsDefault(locationId: String) {
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
+        // val userId = Firebase.auth.currentUser?.uid // TOTO JE ŠPATNĚ
+        if (targetUserId == null) {
             _setDefaultResult.value = SetDefaultResult.Error("User not logged in")
             return
         }
@@ -141,7 +159,7 @@ class LocationListViewModel : ViewModel() {
             try {
                 // Najdi aktuální výchozí lokaci
                 val currentDefaultSnapshot = db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!) // POUŽIJ ULOŽENÉ ID
                     .collection("locations")
                     .whereEqualTo("isDefault", true)
                     .get()
@@ -154,7 +172,7 @@ class LocationListViewModel : ViewModel() {
 
                 // Nastav novou výchozí lokaci
                 db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!) // POUŽIJ ULOŽENÉ ID
                     .collection("locations")
                     .document(locationId)
                     .update("isDefault", true)
@@ -162,11 +180,11 @@ class LocationListViewModel : ViewModel() {
 
                 // Aktualizuj defaultLocationId v user dokumentu
                 db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!) // POUŽIJ ULOŽENÉ ID
                     .update("defaultLocationId", locationId)
                     .await()
 
-                Log.d(tag, "Location $locationId set as default")
+                Log.d(tag, "Location $locationId set as default for user $targetUserId")
                 _setDefaultResult.value = SetDefaultResult.Success
                 _isLoading.value = false
 

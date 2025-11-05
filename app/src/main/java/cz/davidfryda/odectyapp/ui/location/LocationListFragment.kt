@@ -1,14 +1,17 @@
 package cz.davidfryda.odectyapp.ui.location
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs // <-- NOVÝ IMPORT
 import androidx.recyclerview.widget.DividerItemDecoration
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import cz.davidfryda.odectyapp.R
@@ -23,6 +26,10 @@ class LocationListFragment : Fragment() {
     private val viewModel: LocationListViewModel by viewModels()
     private lateinit var adapter: LocationAdapter
 
+    // NOVÉ: Načtení argumentů z navigace
+    private val args: LocationListFragmentArgs by navArgs()
+    private var currentUserId: String? = null
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -35,28 +42,46 @@ class LocationListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // NOVÉ: Získání userId z argumentů
+        currentUserId = args.userId
+        Log.d("LocationListFragment", "Zobrazení lokací pro userId: $currentUserId")
+
+        // NOVÉ: Změna titulku, pokud jsme v Master režimu
+        if (currentUserId != null) {
+            (activity as? AppCompatActivity)?.supportActionBar?.title = "Lokace uživatele"
+            // V režimu mastera skryj FAB pro přidání lokace
+            binding.fabAddLocation.visibility = View.GONE
+        } else {
+            (activity as? AppCompatActivity)?.supportActionBar?.title = getString(R.string.locations)
+            binding.fabAddLocation.visibility = View.VISIBLE
+        }
+
         setupRecyclerView()
         setupObservers()
 
         binding.fabAddLocation.setOnClickListener {
-            findNavController().navigate(R.id.action_locationListFragment_to_addLocationFragment)
+            // UPRAVENO: Předání userId do AddLocationFragment
+            val action = LocationListFragmentDirections
+                .actionLocationListFragmentToAddLocationFragment(currentUserId)
+            findNavController().navigate(action)
         }
 
-        viewModel.loadLocations()
+        // UPRAVENO: Zavolání nové metody ve ViewModelu
+        viewModel.loadLocationsForUser(currentUserId)
     }
 
     private fun setupRecyclerView() {
         adapter = LocationAdapter(
             onLocationClick = { location ->
-                // TODO: Navigace na detail lokace
+                // UPRAVENO: Předání locationId A userId do detailu
                 val action = LocationListFragmentDirections
-                    .actionLocationListFragmentToLocationDetailFragment(location.id)
+                    .actionLocationListFragmentToLocationDetailFragment(location.id, currentUserId)
                 findNavController().navigate(action)
             },
             onEditClick = { location ->
-                // TODO: Navigace na edit fragmentu
+                // UPRAVENO: Předání locationId A userId do editace
                 val action = LocationListFragmentDirections
-                    .actionLocationListFragmentToEditLocationFragment(location.id)
+                    .actionLocationListFragmentToEditLocationFragment(location.id, currentUserId)
                 findNavController().navigate(action)
             },
             onDeleteClick = { location ->
@@ -79,7 +104,7 @@ class LocationListFragment : Fragment() {
 
             // Zobraz empty state pokud není žádná lokace
             val isEmpty = locations.isEmpty()
-            binding.emptyStateLayout.isVisible = isEmpty && viewModel.isLoading.value != true
+            binding.emptyStateLayout.isVisible = isEmpty && viewModel.isLoading.value == false
             binding.locationsRecyclerView.isVisible = !isEmpty
         }
 
@@ -130,5 +155,12 @@ class LocationListFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    // NOVÉ: Obnovení titulku při opuštění fragmentu
+    override fun onStop() {
+        super.onStop()
+        // Vrátí titulky zpět (MainActivity si to stejně přepíše, ale pro jistotu)
+        (activity as? AppCompatActivity)?.supportActionBar?.title = getString(R.string.app_name)
     }
 }
