@@ -14,11 +14,6 @@
             android:id="@+id/action_loginFragment_to_registerFragment"
             app:destination="@id/registerFragment" />
         <action
-            android:id="@+id/action_loginFragment_to_mainFragment"
-            app:destination="@id/mainFragment"
-            app:popUpTo="@id/nav_graph"
-            app:popUpToInclusive="true" />
-        <action
             android:id="@+id/action_loginFragment_to_masterUserListFragment"
             app:destination="@id/masterUserListFragment"
             app:popUpTo="@id/nav_graph"
@@ -26,6 +21,9 @@
         <action
             android:id="@+id/action_loginFragment_to_userInfoFragment"
             app:destination="@id/userInfoFragment" />
+        <action
+            android:id="@+id/action_loginFragment_to_locationListFragment"
+            app:destination="@id/locationListFragment" />
     </fragment>
 
     <fragment
@@ -42,15 +40,13 @@
             app:popUpTo="@id/nav_graph"
             app:popUpToInclusive="true" />
         <action
-            android:id="@+id/action_registerFragment_to_mainFragment"
-            app:destination="@id/mainFragment"
-            app:popUpTo="@id/nav_graph"
-            app:popUpToInclusive="true" />
-        <action
             android:id="@+id/action_registerFragment_to_masterUserListFragment"
             app:destination="@id/masterUserListFragment"
             app:popUpTo="@id/nav_graph"
             app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_registerFragment_to_locationListFragment"
+            app:destination="@id/locationListFragment" />
     </fragment>
 
     <fragment
@@ -89,23 +85,6 @@
     </fragment>
 
     <fragment
-        android:id="@+id/mainFragment"
-        android:name="cz.davidfryda.odectyapp.ui.main.MainFragment"
-        android:label="Moje Měřáky"
-        tools:layout="@layout/fragment_main" >
-        <action
-            android:id="@+id/action_mainFragment_to_meterDetailFragment"
-            app:destination="@id/meterDetailFragment" />
-        <action
-            android:id="@+id/action_mainFragment_to_locationListFragment"
-            app:destination="@id/locationListFragment"
-            app:enterAnim="@anim/slide_in_right"
-            app:exitAnim="@anim/slide_out_left"
-            app:popEnterAnim="@anim/slide_in_left"
-            app:popExitAnim="@anim/slide_out_right" />
-    </fragment>
-
-    <fragment
         android:id="@+id/meterDetailFragment"
         android:name="cz.davidfryda.odectyapp.ui.main.MeterDetailFragment"
         android:label="Detail Měřáku"
@@ -118,6 +97,9 @@
             app:argType="string"
             app:nullable="true"
             android:defaultValue="@null" />
+        <argument
+            android:name="locationId"
+            app:argType="string" />
         <action
             android:id="@+id/action_meterDetailFragment_to_chartFragment"
             app:destination="@id/chartFragment" />
@@ -179,9 +161,6 @@
         android:label="Správa uživatelů"
         tools:layout="@layout/fragment_master_user_list" >
         <action
-            android:id="@+id/action_masterUserListFragment_to_masterUserDetailFragment"
-            app:destination="@id/masterUserDetailFragment" />
-        <action
             android:id="@+id/action_masterUserListFragment_to_userDetailFragment"
             app:destination="@id/userDetailFragment" />
         <!-- ✨ NOVÁ akce: Navigace na lokace uživatele -->
@@ -200,22 +179,10 @@
         </action>
     </fragment>
 
-    <fragment
-        android:id="@+id/masterUserDetailFragment"
-        android:name="cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragment"
-        tools:layout="@layout/fragment_master_user_detail" >
-        <argument
-            android:name="userId"
-            app:argType="string" />
-        <action
-            android:id="@+id/action_masterUserDetailFragment_to_meterDetailFragment"
-            app:destination="@id/meterDetailFragment" />
-    </fragment>
-
     <dialog
         android:id="@+id/notificationListFragment"
         android:name="cz.davidfryda.odectyapp.ui.notifications.NotificationListFragment"
-        android:label="fragment_notification_list"
+        android:label=""
         tools:layout="@layout/fragment_notification_list" >
     </dialog>
 
@@ -473,6 +440,9 @@
             app:argType="string"
             app:nullable="true"
             android:defaultValue="@null" />
+        <argument
+            android:name="locationId"
+            app:argType="string" />
 
     </fragment>
 

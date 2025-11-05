@@ -74,7 +74,7 @@ class LoginFragment : Fragment() {
                     } else if (result.isMaster) {
                         findNavController().navigate(R.id.action_loginFragment_to_masterUserListFragment)
                     } else {
-                        findNavController().navigate(R.id.action_loginFragment_to_mainFragment)
+                        findNavController().navigate(R.id.action_loginFragment_to_locationListFragment)
                     }
                 }
                 is AuthResult.Error -> {

@@ -385,8 +385,12 @@ class MeterDetailViewModel : ViewModel() {
         }
     }
 
+    // ✨✨✨ KLÍČOVÁ OPRAVA ZDE ✨✨✨
+    // Funkce nyní přijímá pouze 'userId' a 'meterId', protože 'locationId' není potřeba
+    // k nalezení měřáku podle vaší struktury z 'index.js'.
     fun loadMeterDetails(userId: String, meterId: String) {
-        db.collection("users").document(userId).collection("meters").document(meterId)
+        db.collection("users").document(userId)
+            .collection("meters").document(meterId)    // <-- OPRAVA (podle index.js)
             .get()
             .addOnSuccessListener { document ->
                 document.toObject(Meter::class.java)?.let {

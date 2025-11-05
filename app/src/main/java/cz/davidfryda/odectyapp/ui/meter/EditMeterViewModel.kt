@@ -5,8 +5,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.data.Location
@@ -30,20 +28,11 @@ class EditMeterViewModel : ViewModel() {
     private val _saveResult = MutableLiveData<SaveResult>()
     val saveResult: LiveData<SaveResult> = _saveResult
 
-    fun loadMeter(meterId: String) {
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
-            Log.e(tag, "User not logged in")
-            _meter.value = null
-            return
-        }
-
+    fun loadMeter(userId: String, meterId: String) {
         _isLoading.value = true
 
-        db.collection("users")
-            .document(userId)
-            .collection("meters")
-            .document(meterId)
+        db.collection("users").document(userId)
+            .collection("meters").document(meterId)
             .get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
@@ -63,22 +52,21 @@ class EditMeterViewModel : ViewModel() {
             }
     }
 
-    fun loadLocations() {
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
+    fun loadLocations(userId: String) {
+        if (userId.isBlank()) {
             Log.e(tag, "User not logged in")
             _locations.value = null
             return
         }
 
-        db.collection("users").document(userId).collection("locations")
+        db.collection("users").document(userId)
+            .collection("locations")
             .get()
             .addOnSuccessListener { documents ->
                 val locationsList = documents.mapNotNull { doc ->
                     doc.toObject(Location::class.java).copy(id = doc.id)
                 }
 
-                // Seřaď v kódu: výchozí první, pak podle data vytvoření
                 val sortedLocations = locationsList.sortedWith(
                     compareByDescending<Location> { it.isDefault }
                         .thenBy { it.createdAt }
@@ -94,29 +82,25 @@ class EditMeterViewModel : ViewModel() {
     }
 
     fun updateMeter(
+        userId: String,
         meterId: String,
-        locationId: String,
+        newLocationId: String,
         name: String,
         type: String
     ) {
-        // Validace
-        if (locationId.isBlank()) {
+        if (newLocationId.isBlank()) {
             _saveResult.value = SaveResult.Error("Odběrné místo je povinné")
             return
         }
-
         if (name.isBlank()) {
             _saveResult.value = SaveResult.Error("Název měřáku je povinný")
             return
         }
-
         if (type.isBlank()) {
             _saveResult.value = SaveResult.Error("Typ měřáku je povinný")
             return
         }
-
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
+        if (userId.isBlank()) {
             _saveResult.value = SaveResult.Error("Uživatel není přihlášen")
             return
         }
@@ -125,15 +109,13 @@ class EditMeterViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val updates = hashMapOf<String, Any>(
-                    "locationId" to locationId,
+                    "locationId" to newLocationId,
                     "name" to name.trim(),
                     "type" to type.trim()
                 )
 
-                db.collection("users")
-                    .document(userId)
-                    .collection("meters")
-                    .document(meterId)
+                db.collection("users").document(userId)
+                    .collection("meters").document(meterId)
                     .update(updates)
                     .await()
 

@@ -154,6 +154,7 @@
     <string name="delete_location_message">Opravdu chcete smazat místo \"%1$s\"? Tuto akci nelze vrátit zpět.</string>
     <string name="location_deleted">Místo smazáno</string>
     <string name="default_location_updated">Výchozí místo aktualizováno</string>
+    <string name="user">Uživatel</string>
     <!-- Add Location strings -->
     <string name="add_new_location">Nové odběrné místo</string>
     <string name="location_name">Název místa</string>
@@ -199,6 +200,7 @@
     <string name="meter_type">Typ měřáku</string>
     <string name="meter_type_helper">Vyberte typ měřáku</string>
     <string name="meter_type_required">Typ měřáku je povinný</string>
+    <string name="location_required_from_list">Vyberte odběrné místo ze seznamu</string>
     <string name="add_meter_info">Měřák bude přiřazen k vybranému odběrnému místu. Později můžete měřák přesunout na jiné místo.</string>
     <string name="meter_added_successfully">Měřák přidán</string>
     <string name="no_locations_create_first">Nejdřív vytvořte odběrné místo</string>

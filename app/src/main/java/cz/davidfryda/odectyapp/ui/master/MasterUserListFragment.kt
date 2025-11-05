@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
+import android.util.Log
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -13,23 +14,27 @@ import android.widget.AutoCompleteTextView
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.widget.Toolbar // ✨ IMPORT NAVÍC
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
+import androidx.navigation.ui.setupWithNavController // ✨ IMPORT NAVÍC
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import cz.davidfryda.odectyapp.MainActivity // ✨ IMPORT NAVÍC
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.databinding.FragmentMasterUserListBinding
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
-import android.util.Log
-import androidx.navigation.fragment.findNavController
 
 
+// ✨ PŘIDÁNA ANOTACE OPT-IN (kvůli přístupu k appBarConfiguration)
+@OptIn(com.google.android.material.badge.ExperimentalBadgeUtils::class)
 class MasterUserListFragment : Fragment() {
     private var _binding: FragmentMasterUserListBinding? = null
     private val binding get() = _binding!!
@@ -133,6 +138,18 @@ class MasterUserListFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // ✨ === ZAČÁTEK OPRAVY NAVIGACE ===
+        // Tento kód zajistí, že se hamburger menu (a propojení s DrawerLayout)
+        // správně nastaví pokaždé, když se na tuto obrazovku vrátíme.
+        (activity as? MainActivity)?.let { mainActivity ->
+            val toolbar = mainActivity.findViewById<Toolbar>(R.id.toolbar)
+            // Použijeme globální appBarConfiguration z MainActivity,
+            // která ví, že toto je domovská obrazovka.
+            toolbar.setupWithNavController(findNavController(), mainActivity.appBarConfiguration)
+        }
+        // ✨ === KONEC OPRAVY NAVIGACE ===
+
         setupRecyclerView()
         setupFilterSpinners()
 

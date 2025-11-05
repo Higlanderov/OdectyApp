@@ -38,7 +38,13 @@ class MeterDetailFragment : Fragment() {
     private val viewModel: MeterDetailViewModel by viewModels()
     private var latestTmpUri: Uri? = null
     private lateinit var historyAdapter: ReadingHistoryAdapter
+
+    // Zde ukládáme ID uživatele, kterého prohlížíme
     private lateinit var targetUserId: String
+
+    // locationId zde můžeme nechat, protože ho posílá nav_graph,
+    // ale pro ViewModel ho už nepotřebujeme
+    private var locationId: String? = null
 
     // Dočasná paměť pro potvrzení
     private var lastEnteredValue: Double? = null
@@ -69,10 +75,20 @@ class MeterDetailFragment : Fragment() {
         // NOVÉ: Resetujeme validaci při vstupu na obrazovku
         viewModel.resetValidationResult()
 
+        // Načtení userId a locationId z argumentů
         targetUserId = if (args.userId != null) {
             args.userId!!
         } else {
             Firebase.auth.currentUser!!.uid
+        }
+        locationId = args.locationId // Načteme ho, i když ho možná nepoužijeme
+
+        // Kontrola, zda máme všechna potřebná ID
+        // (Kontrolu locationId můžeme smazat, pokud není kritická)
+        if (targetUserId.isBlank()) {
+            Toast.makeText(context, "Chyba: Chybí ID uživatele.", Toast.LENGTH_LONG).show()
+            findNavController().navigateUp()
+            return
         }
 
         viewModel.initializeForUser(targetUserId, args.meterId, requireContext())
@@ -83,6 +99,8 @@ class MeterDetailFragment : Fragment() {
         val isMasterView = !isLoggedInUser
         historyAdapter.isMasterView = isMasterView
 
+        // ✨✨✨ KLÍČOVÁ OPRAVA ZDE ✨✨✨
+        // Voláme opravenou funkci ViewModelu (už jen 2 argumenty)
         viewModel.loadMeterDetails(targetUserId, args.meterId)
 
         viewModel.readingHistory.observe(viewLifecycleOwner) { history ->
@@ -114,9 +132,6 @@ class MeterDetailFragment : Fragment() {
                 if (lastEnteredValue == null && lastPhotoUri == null) {
                     Toast.makeText(requireContext(), "Odečet úspěšně zpracován!", Toast.LENGTH_SHORT).show()
                 }
-                // ODSTRANĚNO: Nemazat hodnoty tady, smažou se v dialogu
-                // lastEnteredValue = null
-                // lastPhotoUri = null
             } else if (result is UploadResult.Error) {
                 Toast.makeText(requireContext(), "Chyba nahrávání: ${result.message}", Toast.LENGTH_LONG).show()
             }

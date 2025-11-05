@@ -13,6 +13,8 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.navigation.fragment.navArgs
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Location
 import cz.davidfryda.odectyapp.databinding.FragmentEditMeterBinding
@@ -28,8 +30,8 @@ class EditMeterFragment : Fragment() {
     private val locationsList = mutableListOf<Location>()
     private val locationsMap = mutableMapOf<String, String>() // name -> id
     private var selectedLocationId: String? = null
+    private var targetUserId: String? = null
 
-    // Typy měřáků
     private val meterTypes = listOf(
         "Elektřina",
         "Plyn",
@@ -50,13 +52,20 @@ class EditMeterFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        targetUserId = args.userId ?: Firebase.auth.currentUser?.uid
+
+        if (targetUserId == null) {
+            Toast.makeText(context, "Chyba: Nelze identifikovat uživatele", Toast.LENGTH_LONG).show()
+            findNavController().navigateUp()
+            return
+        }
+
         setupMeterTypeSpinner()
         setupUI()
         setupObservers()
 
-        // Načti data
-        viewModel.loadMeter(args.meterId)
-        viewModel.loadLocations()
+        viewModel.loadMeter(targetUserId!!, args.meterId)
+        viewModel.loadLocations(targetUserId!!)
     }
 
     private fun setupMeterTypeSpinner() {
@@ -67,24 +76,20 @@ class EditMeterFragment : Fragment() {
         )
         binding.meterTypeSpinner.setAdapter(adapter)
 
-        // Listener pro otevření dropdownu
         binding.meterTypeSpinner.setOnClickListener {
             binding.meterTypeSpinner.showDropDown()
         }
     }
 
     private fun setupUI() {
-        // Clear error při psaní
         binding.meterNameEditText.doAfterTextChanged {
             binding.meterNameLayout.error = null
         }
 
-        // Tlačítko Zrušit
         binding.cancelButton.setOnClickListener {
             findNavController().navigateUp()
         }
 
-        // Tlačítko Uložit
         binding.saveButton.setOnClickListener {
             saveMeter()
         }
@@ -93,12 +98,11 @@ class EditMeterFragment : Fragment() {
     private fun setupObservers() {
         viewModel.meter.observe(viewLifecycleOwner) { meter ->
             if (meter != null) {
-                // Předvyplň formulář
                 binding.meterNameEditText.setText(meter.name)
                 binding.meterTypeSpinner.setText(meter.type, false)
                 selectedLocationId = meter.locationId
+                updateLocationSpinnerSelection(meter.locationId)
 
-                // Zobraz content
                 binding.loadingLayout.isVisible = false
                 binding.contentLayout.isVisible = true
             } else {
@@ -129,7 +133,6 @@ class EditMeterFragment : Fragment() {
                 return@observe
             }
 
-            // Naplň data
             val names = mutableListOf<String>()
             for (location in locations) {
                 locationsList.add(location)
@@ -139,7 +142,6 @@ class EditMeterFragment : Fragment() {
 
             Log.d("EditMeterFragment", "Načteno ${locations.size} lokací: $names")
 
-            // Nastav adapter pro spinner
             val adapter = ArrayAdapter(
                 requireContext(),
                 android.R.layout.simple_dropdown_item_1line,
@@ -147,12 +149,10 @@ class EditMeterFragment : Fragment() {
             )
             binding.locationSpinner.setAdapter(adapter)
 
-            // Přidej listener pro otevření dropdownu
             binding.locationSpinner.setOnClickListener {
                 binding.locationSpinner.showDropDown()
             }
 
-            // Listener pro výběr položky
             binding.locationSpinner.setOnItemClickListener { _, _, position, _ ->
                 val selectedLocation = locationsList[position]
                 selectedLocationId = selectedLocation.id
@@ -160,13 +160,9 @@ class EditMeterFragment : Fragment() {
                 Log.d("EditMeterFragment", "Vybrána lokace: ${selectedLocation.name}")
             }
 
-            // Předvyber aktuální lokaci měřáku
             val currentMeter = viewModel.meter.value
             if (currentMeter != null) {
-                val currentLocation = locations.find { it.id == currentMeter.locationId }
-                if (currentLocation != null) {
-                    binding.locationSpinner.setText(currentLocation.name, false)
-                }
+                updateLocationSpinnerSelection(currentMeter.locationId)
             }
         }
 
@@ -175,7 +171,6 @@ class EditMeterFragment : Fragment() {
             binding.saveButton.isEnabled = !isLoading
             binding.cancelButton.isEnabled = !isLoading
 
-            // Disable input fields during loading
             if (binding.contentLayout.isVisible) {
                 binding.locationSpinner.isEnabled = !isLoading
                 binding.meterNameEditText.isEnabled = !isLoading
@@ -203,17 +198,23 @@ class EditMeterFragment : Fragment() {
         }
     }
 
+    private fun updateLocationSpinnerSelection(locationId: String) {
+        val currentLocation = locationsList.find { it.id == locationId }
+        if (currentLocation != null) {
+            binding.locationSpinner.setText(currentLocation.name, false)
+        }
+    }
+
     private fun saveMeter() {
         val locationName = binding.locationSpinner.text.toString().trim()
-        val locationId = locationsMap[locationName] ?: selectedLocationId
+        val newLocationId = locationsMap[locationName] ?: selectedLocationId
 
         val name = binding.meterNameEditText.text.toString().trim()
         val type = binding.meterTypeSpinner.text.toString().trim()
 
-        // Validace na UI straně
         var hasError = false
 
-        if (locationId.isNullOrBlank()) {
+        if (newLocationId.isNullOrBlank()) {
             binding.locationSpinnerLayout.error = getString(R.string.location_required)
             hasError = true
         } else {
@@ -234,16 +235,20 @@ class EditMeterFragment : Fragment() {
             return
         }
 
-        // Smart cast check
-        if (locationId == null) {
+        if (newLocationId == null) {
             Toast.makeText(context, R.string.location_required, Toast.LENGTH_SHORT).show()
             return
         }
 
-        Log.d("EditMeterFragment", "Aktualizuji měřák: meterId=${args.meterId}, location=$locationId, name=$name, type=$type")
+        Log.d("EditMeterFragment", "Aktualizuji měřák: meterId=${args.meterId}, newLocationId=$newLocationId, name=$name, type=$type")
 
-        // Zavolej ViewModel
-        viewModel.updateMeter(args.meterId, locationId, name, type)
+        viewModel.updateMeter(
+            userId = targetUserId!!,
+            meterId = args.meterId,
+            newLocationId = newLocationId,
+            name = name,
+            type = type
+        )
     }
 
     override fun onDestroyView() {

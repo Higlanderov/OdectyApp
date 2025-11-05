@@ -14,33 +14,30 @@ import androidx.recyclerview.widget.RecyclerView
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.ListItemMeterBinding
-import cz.davidfryda.odectyapp.ui.masterdetail.MasterUserDetailFragmentDirections
+import cz.davidfryda.odectyapp.ui.location.LocationDetailFragmentDirections
 
 /**
  * Listener pro interakce s položkou měřáku v RecyclerView.
  * Zahrnuje akce pro úpravu, smazání (pro uživatele) a přidání popisu (pro mastera).
  */
 interface MeterInteractionListener {
-    fun onEditMeterClicked(meter: Meter) // Voláno, když uživatel klikne na "Upravit název"
-    fun onDeleteMeterClicked(meter: Meter) // Voláno, když uživatel klikne na "Smazat měřák"
-    fun onAddDescriptionClicked(meter: Meter, ownerUserId: String) // Voláno, když master klikne na "Přidat/Upravit popis"
+    fun onEditMeterClicked(meter: Meter)
+    fun onDeleteMeterClicked(meter: Meter)
+    fun onAddDescriptionClicked(meter: Meter, ownerUserId: String)
 }
 
 class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffCallback()) {
 
-    // ID uživatele, jehož měřáky zobrazujeme (null pro přihlášeného uživatele, ID pro mastera)
     var ownerId: String? = null
-
-    // ✨ NOVÝ: Příznak, zda master prohlíží svůj vlastní profil
     var isMasterOwnProfile: Boolean = false
-
-    // Listener pro komunikaci s fragmentem
     var listener: MeterInteractionListener? = null
+
+    // ✨ NOVÉ: LocationId pro navigaci
+    var currentLocationId: String? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MeterViewHolder {
         val binding = ListItemMeterBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        // Předáme listener, ownerId a isMasterOwnProfile do ViewHolderu
-        return MeterViewHolder(binding, listener, ownerId, isMasterOwnProfile)
+        return MeterViewHolder(binding, listener, ownerId, isMasterOwnProfile, currentLocationId)
     }
 
     override fun onBindViewHolder(holder: MeterViewHolder, position: Int) {
@@ -50,16 +47,15 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
     class MeterViewHolder(
         private val binding: ListItemMeterBinding,
         private val listener: MeterInteractionListener?,
-        private val ownerId: String?, // ViewHolder si pamatuje, v jakém je režimu a ID vlastníka
-        private val isMasterOwnProfile: Boolean // ✨ NOVÉ: Příznak vlastního profilu
+        private val ownerId: String?,
+        private val isMasterOwnProfile: Boolean,
+        private val currentLocationId: String? // ✨ NOVÝ parametr
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        private lateinit var currentMeter: Meter // Uchováme si aktuální měřák pro listenery
+        private lateinit var currentMeter: Meter
 
         init {
-            // Nastavení listeneru pro tlačítko menu
             binding.meterOptionsMenuButton.setOnClickListener { view ->
-                // Zobrazíme vyskakovací menu, pokud máme listener
                 if (listener != null) {
                     showPopupMenu(view)
                 } else {
@@ -69,19 +65,14 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
         }
 
         fun bind(meter: Meter) {
-            currentMeter = meter // Uložíme si aktuální měřák
+            currentMeter = meter
 
-            // --- ZAČÁTEK UPRAVENÉ ČÁSTI ---
-            // Rozlišení master vs. běžný uživatel pro zobrazení názvů
-            if (ownerId != null) { // Master režim
-                // ✨ NOVÉ: Pokud master prohlíží svůj vlastní profil, zobrazí se název jako běžnému uživateli
+            if (ownerId != null) {
                 if (isMasterOwnProfile) {
-                    binding.meterName.text = meter.name // Jen název
+                    binding.meterName.text = meter.name
                     binding.originalMeterName.isVisible = false
                 } else {
-                    // Master prohlíží cizí profil
-                    binding.meterName.text = meter.masterDescription ?: meter.name // Priorita je popis od mastera
-                    // Zobrazíme původní název, jen pokud masterDescription existuje A liší se od původního názvu
+                    binding.meterName.text = meter.masterDescription ?: meter.name
                     if (meter.masterDescription != null && meter.masterDescription != meter.name) {
                         binding.originalMeterName.text = itemView.context.getString(R.string.original_meter_name_label, meter.name)
                         binding.originalMeterName.isVisible = true
@@ -89,92 +80,71 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                         binding.originalMeterName.isVisible = false
                     }
                 }
-                binding.meterOptionsMenuButton.isVisible = true // Master může vždy přidat popis nebo upravit své měřáky
-            } else { // Běžný uživatelský režim
-                binding.meterName.text = meter.name // Zobrazíme jen název měřáku
-                binding.originalMeterName.isVisible = false // Skryjeme TextView pro původní název
-                binding.meterOptionsMenuButton.isVisible = true // Uživatel může upravit/smazat
+                binding.meterOptionsMenuButton.isVisible = true
+            } else {
+                binding.meterName.text = meter.name
+                binding.originalMeterName.isVisible = false
+                binding.meterOptionsMenuButton.isVisible = true
             }
-            // --- KONEC UPRAVENÉ ČÁSTI ---
 
-            // Nastavení ikony měřáku
             val iconRes = when (meter.type) {
                 "Plyn" -> R.drawable.ic_meter_gas
                 "Voda" -> R.drawable.ic_meter_water
                 "Elektřina" -> R.drawable.ic_meter_electricity
-                else -> R.drawable.ic_launcher_foreground // Výchozí ikona
+                else -> R.drawable.ic_launcher_foreground
             }
             binding.meterIcon.setImageResource(iconRes)
 
-            // Placeholder text (může být nahrazen reálným stavem později)
             binding.lastReadingStatus.text = itemView.context.getString(R.string.click_for_detail)
 
-            // Kliknutí na celou položku pro navigaci do detailu
             itemView.setOnClickListener {
-                // KLÍČOVÁ LOGIKA NAVIGACE: Rozlišíme, odkud navigujeme
                 val navController = itemView.findNavController()
-                val currentDestinationId = navController.currentDestination?.id
 
                 try {
-                    if (currentDestinationId == R.id.masterUserDetailFragment && ownerId != null) {
-                        // Jsme v Master režimu (na obrazovce MasterUserDetailFragment)
-                        if (ownerId.isBlank()) {
-                            Log.e("MeterAdapter", "Cannot navigate to detail in master mode, ownerId is blank for meter: ${meter.id}")
-                            Toast.makeText(itemView.context, "Chyba: Chybí ID uživatele.", Toast.LENGTH_SHORT).show()
-                            return@setOnClickListener
-                        }
+                    // Použijeme currentLocationId pokud je k dispozici, jinak fallback na meter.locationId
+                    val locationId = currentLocationId ?: meter.locationId
 
-                        Log.d("MeterAdapter", "Navigating from MasterUserDetail to MeterDetail (meterId: ${meter.id}, userId: $ownerId, isMasterOwnProfile: $isMasterOwnProfile)")
-                        val action = MasterUserDetailFragmentDirections
-                            .actionMasterUserDetailFragmentToMeterDetailFragment(
-                                meterId = meter.id,
-                                userId = ownerId // Předáme ID uživatele, kterého prohlížíme
-                            )
-                        navController.navigate(action)
-
-                    } else if (currentDestinationId == R.id.mainFragment && ownerId == null) {
-                        // Jsme v běžném režimu (na obrazovce MainFragment)
-                        // V tomto režimu se spoléháme na to, že MeterDetailFragment si zjistí ID aktuálního uživatele sám.
-                        Log.d("MeterAdapter", "Navigating from MainFragment to MeterDetail (meterId: ${meter.id})")
-                        val action = MainFragmentDirections
-                            .actionMainFragmentToMeterDetailFragment(
-                                meterId = meter.id
-                                // userId se nepředává, bude null (výchozí hodnota v MeterDetailFragment a signál pro "použij aktuálního uživatele")
-                            )
-                        navController.navigate(action)
-                    } else {
-                        // Fallback nebo logování chyby, pokud jsme na neočekávané obrazovce
-                        Log.w("MeterAdapter", "Unexpected navigation state: currentDestination=$currentDestinationId, ownerId=$ownerId")
+                    if (locationId.isBlank()) {
+                        Log.e("MeterAdapter", "Cannot navigate, locationId is blank for meter: ${'$'}{meter.id}")
+                        Toast.makeText(itemView.context, "Chyba: Chybí ID lokace.", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
                     }
-                } catch (e: Exception) { // Zachycení obecnější výjimky pro jistotu
-                    // Zachycení chyby, pokud akce není nalezena nebo nastane jiný navigační problém
-                    Log.e("MeterAdapter", "Navigation failed for meter ${meter.id} from destination $currentDestinationId", e)
+
+                    Log.d("MeterAdapter", "Navigating to MeterDetail (meterId: ${'$'}{meter.id}, userId: $ownerId, locationId: $locationId)")
+
+                    // Navigace se liší podle toho, zda jsme v kontextu mastera nebo běžného uživatele.
+                    // Pro zjednodušení použijeme jednu akci, která zvládne oba případy.
+                    // Předpokládáme, že navigační graf má globální akci nebo že jsme ve fragmentu, který ji definuje.
+                    // V tomto případě je `LocationDetailFragmentDirections` bezpečnější, protože `LocationDetailFragment` zůstal.
+                    val action = LocationDetailFragmentDirections.actionLocationDetailFragmentToMeterDetailFragment(
+                            meterId = meter.id,
+                            userId = ownerId,  // Bude null pro běžného uživatele, což je správně
+                            locationId = locationId
+                        )
+                    navController.navigate(action)
+
+                } catch (e: Exception) {
+                    Log.e("MeterAdapter", "Navigation failed for meter ${'$'}{meter.id}", e)
                     Toast.makeText(itemView.context, "Chyba navigace.", Toast.LENGTH_SHORT).show()
                 }
             }
         }
 
-        /**
-         * Zobrazí vyskakovací menu s příslušnými akcemi podle režimu (master/uživatel/master vlastní profil).
-         * @param view Pohled (ImageButton), ke kterému se menu ukotví.
-         */
         private fun showPopupMenu(view: View) {
             val popup = PopupMenu(view.context, view)
 
-            // ✨ NOVÉ: Rozlišení podle toho, jestli je to vlastní profil mastera
             if (ownerId != null && isMasterOwnProfile) {
-                // Master prohlíží svůj vlastní profil = plná práva jako běžný uživatel
-                Log.d("MeterAdapter", "Showing user menu for master's own meter: ${currentMeter.id}")
+                Log.d("MeterAdapter", "Showing user menu for master's own meter: ${'$'}{currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_edit_meter -> {
-                            Log.d("MeterAdapter", "Edit meter clicked for master's own meter: ${currentMeter.id}")
+                            Log.d("MeterAdapter", "Edit meter clicked for master's own meter: ${'$'}{currentMeter.id}")
                             listener?.onEditMeterClicked(currentMeter)
                             true
                         }
                         R.id.action_delete_meter -> {
-                            Log.d("MeterAdapter", "Delete meter clicked for master's own meter: ${currentMeter.id}")
+                            Log.d("MeterAdapter", "Delete meter clicked for master's own meter: ${'$'}{currentMeter.id}")
                             listener?.onDeleteMeterClicked(currentMeter)
                             true
                         }
@@ -182,13 +152,12 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     }
                 }
             } else if (ownerId != null) {
-                // Master prohlíží cizí profil = jen přidat/upravit popis
-                Log.d("MeterAdapter", "Showing master menu for other user's meter: ${currentMeter.id}")
+                Log.d("MeterAdapter", "Showing master menu for other user's meter: ${'$'}{currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.master_meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_add_description -> {
-                            Log.d("MeterAdapter", "Add description clicked for meter: ${currentMeter.id}, owner: $ownerId")
+                            Log.d("MeterAdapter", "Add description clicked for meter: ${'$'}{currentMeter.id}, owner: $ownerId")
                             listener?.onAddDescriptionClicked(currentMeter, ownerId)
                             true
                         }
@@ -196,18 +165,17 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     }
                 }
             } else {
-                // Běžný uživatelský režim
-                Log.d("MeterAdapter", "Showing user menu for meter: ${currentMeter.id}")
+                Log.d("MeterAdapter", "Showing user menu for meter: ${'$'}{currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_edit_meter -> {
-                            Log.d("MeterAdapter", "Edit meter clicked for meter: ${currentMeter.id}")
+                            Log.d("MeterAdapter", "Edit meter clicked for meter: ${'$'}{currentMeter.id}")
                             listener?.onEditMeterClicked(currentMeter)
                             true
                         }
                         R.id.action_delete_meter -> {
-                            Log.d("MeterAdapter", "Delete meter clicked for meter: ${currentMeter.id}")
+                            Log.d("MeterAdapter", "Delete meter clicked for meter: ${'$'}{currentMeter.id}")
                             listener?.onDeleteMeterClicked(currentMeter)
                             true
                         }
@@ -220,7 +188,6 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
     }
 }
 
-// DiffUtil pro efektivní aktualizace RecyclerView
 class MeterDiffCallback : DiffUtil.ItemCallback<Meter>() {
     override fun areItemsTheSame(oldItem: Meter, newItem: Meter): Boolean = oldItem.id == newItem.id
     override fun areContentsTheSame(oldItem: Meter, newItem: Meter): Boolean = oldItem == newItem

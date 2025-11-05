@@ -17,9 +17,10 @@ import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.FragmentLocationDetailBinding
-import cz.davidfryda.odectyapp.ui.meter.MeterAdapter
+import cz.davidfryda.odectyapp.ui.main.MeterAdapter
+import cz.davidfryda.odectyapp.ui.main.MeterInteractionListener
 
-class LocationDetailFragment : Fragment() {
+class LocationDetailFragment : Fragment(), MeterInteractionListener {
 
     private var _binding: FragmentLocationDetailBinding? = null
     private val binding get() = _binding!!
@@ -27,10 +28,7 @@ class LocationDetailFragment : Fragment() {
     private val viewModel: LocationDetailViewModel by viewModels()
     private val args: LocationDetailFragmentArgs by navArgs()
 
-    // Adapter pro měřáky
     private lateinit var meterAdapter: MeterAdapter
-
-    // ✨ NOVÉ: Target userId
     private var targetUserId: String? = null
 
     override fun onCreateView(
@@ -45,7 +43,6 @@ class LocationDetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ✨ Určí, čí lokaci načíst
         targetUserId = args.userId ?: Firebase.auth.currentUser?.uid
 
         if (targetUserId == null) {
@@ -57,43 +54,22 @@ class LocationDetailFragment : Fragment() {
         setupUI()
         setupObservers()
 
-        // Načti data s userId
         viewModel.loadLocation(targetUserId!!, args.locationId)
         viewModel.loadMeters(targetUserId!!, args.locationId)
     }
 
     private fun setupUI() {
-        // Inicializace adapteru pro měřáky
-        meterAdapter = MeterAdapter(
-            onMeterClick = { meter ->
-                // ✅ Navigace na stávající MeterDetailFragment
-                val action = LocationDetailFragmentDirections
-                    .actionLocationDetailFragmentToMeterDetailFragment(
-                        meterId = meter.id,
-                        userId = targetUserId
-                    )
-                findNavController().navigate(action)
-            },
-            onEditClick = { meter ->
-                val action = LocationDetailFragmentDirections
-                    .actionLocationDetailFragmentToEditMeterFragment(
-                        meterId = meter.id,
-                        userId = targetUserId
-                    )
-                findNavController().navigate(action)
-            },
-            onDeleteClick = { meter ->
-                showDeleteMeterDialog(meter)
-            }
-        )
+        meterAdapter = MeterAdapter().apply {
+            listener = this@LocationDetailFragment
+            currentLocationId = args.locationId
+            ownerId = if (targetUserId != Firebase.auth.currentUser?.uid) targetUserId else null
+        }
 
-        // Nastavení RecyclerView
         binding.metersRecyclerView.apply {
             adapter = meterAdapter
             layoutManager = LinearLayoutManager(context)
         }
 
-        // Tlačítko Upravit lokaci
         binding.editButton.setOnClickListener {
             val action = LocationDetailFragmentDirections
                 .actionLocationDetailFragmentToEditLocationFragment(
@@ -103,12 +79,10 @@ class LocationDetailFragment : Fragment() {
             findNavController().navigate(action)
         }
 
-        // Tlačítko Smazat lokaci
         binding.deleteButton.setOnClickListener {
             showDeleteLocationDialog()
         }
 
-        // FAB - Přidat měřák
         binding.fabAddMeter.setOnClickListener {
             val action = LocationDetailFragmentDirections
                 .actionLocationDetailFragmentToAddMeterFragment(
@@ -119,14 +93,30 @@ class LocationDetailFragment : Fragment() {
         }
     }
 
+    override fun onEditMeterClicked(meter: Meter) {
+        val action = LocationDetailFragmentDirections
+            .actionLocationDetailFragmentToEditMeterFragment(
+                meterId = meter.id,
+                locationId = args.locationId,
+                userId = targetUserId
+            )
+        findNavController().navigate(action)
+    }
+
+    override fun onDeleteMeterClicked(meter: Meter) {
+        showDeleteMeterDialog(meter)
+    }
+
+    override fun onAddDescriptionClicked(meter: Meter, ownerUserId: String) {
+        Toast.makeText(context, "Přidání popisu není dostupné", Toast.LENGTH_SHORT).show()
+    }
+
     private fun setupObservers() {
         viewModel.location.observe(viewLifecycleOwner) { location ->
             if (location != null) {
-                // Zobraz data lokace
                 binding.locationNameTextView.text = location.name
                 binding.locationAddressTextView.text = location.address
 
-                // Poznámka (zobraz jen pokud není prázdná)
                 if (location.note.isNotBlank()) {
                     binding.locationNoteTextView.text = location.note
                     binding.noteLayout.isVisible = true
@@ -134,14 +124,11 @@ class LocationDetailFragment : Fragment() {
                     binding.noteLayout.isVisible = false
                 }
 
-                // Výchozí chip
                 binding.defaultChip.isVisible = location.isDefault
 
-                // Zobraz content, skryj loading
                 binding.loadingLayout.isVisible = false
                 binding.contentLayout.isVisible = true
             } else {
-                // Chyba načítání
                 Toast.makeText(
                     context,
                     R.string.error_loading_location,
@@ -152,20 +139,16 @@ class LocationDetailFragment : Fragment() {
         }
 
         viewModel.meters.observe(viewLifecycleOwner) { meters ->
-            // Aktualizuj počet měřáků
             binding.meterCountTextView.text = meters.size.toString()
 
-            // Empty state
             val isEmpty = meters.isEmpty()
             binding.emptyMetersLayout.isVisible = isEmpty
             binding.metersRecyclerView.isVisible = !isEmpty
 
-            // Předej data do adapteru
             meterAdapter.submitList(meters)
         }
 
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            // Zobraz loading jen při prvním načítání
             if (viewModel.location.value == null) {
                 binding.loadingLayout.isVisible = isLoading
                 binding.contentLayout.isVisible = !isLoading

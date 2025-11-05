@@ -31,7 +31,6 @@ class LocationDetailViewModel : ViewModel() {
     private val _deleteMeterResult = MutableLiveData<DeleteMeterResult>()
     val deleteMeterResult: LiveData<DeleteMeterResult> = _deleteMeterResult
 
-    // ✨ UPRAVENO: Přidán parametr userId
     fun loadLocation(userId: String, locationId: String) {
         _isLoading.value = true
 
@@ -58,7 +57,6 @@ class LocationDetailViewModel : ViewModel() {
             }
     }
 
-    // ✨ UPRAVENO: Přidán parametr userId
     fun loadMeters(userId: String, locationId: String) {
         db.collection("users")
             .document(userId)
@@ -83,15 +81,14 @@ class LocationDetailViewModel : ViewModel() {
             }
     }
 
-    // ✨ UPRAVENO: Přidán parametr userId
     fun deleteLocation(userId: String, locationId: String) {
         viewModelScope.launch {
             try {
-                // Zkontroluj, jestli lokace má měřáky
                 val metersSnapshot = db.collection("users")
                     .document(userId)
                     .collection("meters")
                     .whereEqualTo("locationId", locationId)
+                    .limit(1)
                     .get()
                     .await()
 
@@ -102,7 +99,6 @@ class LocationDetailViewModel : ViewModel() {
                     return@launch
                 }
 
-                // Zkontroluj, jestli je to výchozí lokace
                 val locationDoc = db.collection("users")
                     .document(userId)
                     .collection("locations")
@@ -112,7 +108,6 @@ class LocationDetailViewModel : ViewModel() {
 
                 val isDefault = locationDoc.toObject(Location::class.java)?.isDefault ?: false
 
-                // Smaž lokaci
                 db.collection("users")
                     .document(userId)
                     .collection("locations")
@@ -120,7 +115,6 @@ class LocationDetailViewModel : ViewModel() {
                     .delete()
                     .await()
 
-                // Pokud byla výchozí, nastav jako výchozí první zbývající lokaci
                 if (isDefault) {
                     val remainingLocations = db.collection("users")
                         .document(userId)
@@ -143,7 +137,6 @@ class LocationDetailViewModel : ViewModel() {
                             .update("defaultLocationId", firstLocationId)
                             .await()
                     } else {
-                        // Žádné lokace nezůstaly
                         db.collection("users")
                             .document(userId)
                             .update("defaultLocationId", null)
@@ -161,11 +154,9 @@ class LocationDetailViewModel : ViewModel() {
         }
     }
 
-    // ✨ UPRAVENO: Přidán parametr userId
     fun deleteMeter(userId: String, meterId: String) {
         viewModelScope.launch {
             try {
-                // Smaž měřák
                 db.collection("users")
                     .document(userId)
                     .collection("meters")
@@ -173,7 +164,6 @@ class LocationDetailViewModel : ViewModel() {
                     .delete()
                     .await()
 
-                // Smaž všechny odečty tohoto měřáku
                 val readingsSnapshot = db.collection("readings")
                     .whereEqualTo("meterId", meterId)
                     .get()
@@ -208,8 +198,8 @@ class LocationDetailViewModel : ViewModel() {
     }
 
     sealed class DeleteMeterResult {
-        object Idle : DeleteMeterResult()
-        object Success : DeleteMeterResult()
-        data class Error(val message: String) : DeleteMeterResult()
+        object Idle : DeleteMeterResult() // <-- Opraveno
+        object Success : DeleteMeterResult() // <-- Opraveno
+        data class Error(val message: String) : DeleteMeterResult() // <-- Opraveno
     }
 }

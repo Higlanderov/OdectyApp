@@ -5,18 +5,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
-import androidx.navigation.fragment.navArgs
-import androidx.navigation.ui.setupWithNavController
 import androidx.recyclerview.widget.DividerItemDecoration
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
-import cz.davidfryda.odectyapp.MainActivity
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Location
 import cz.davidfryda.odectyapp.databinding.FragmentLocationListBinding
@@ -28,10 +22,6 @@ class LocationListFragment : Fragment() {
 
     private val viewModel: LocationListViewModel by viewModels()
     private lateinit var adapter: LocationAdapter
-
-    // ✨ NOVÉ: Přijmi userId z argumentů (pro mastera)
-    private val args: LocationListFragmentArgs by navArgs()
-    private var targetUserId: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -45,52 +35,28 @@ class LocationListFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // ✨ Určí, čí lokace načíst (master nebo vlastní)
-        targetUserId = args.userId ?: Firebase.auth.currentUser?.uid
-
-        if (targetUserId == null) {
-            Toast.makeText(context, "Chyba: Uživatel není přihlášen", Toast.LENGTH_LONG).show()
-            findNavController().navigateUp()
-            return
-        }
-
-        setupToolbar()
         setupRecyclerView()
         setupObservers()
 
         binding.fabAddLocation.setOnClickListener {
-            val action = LocationListFragmentDirections
-                .actionLocationListFragmentToAddLocationFragment(targetUserId)
-            findNavController().navigate(action)
+            findNavController().navigate(R.id.action_locationListFragment_to_addLocationFragment)
         }
 
         viewModel.loadLocations()
     }
 
-    private fun setupToolbar() {
-        (activity as? AppCompatActivity)?.setSupportActionBar(binding.toolbar)
-        binding.toolbar.setupWithNavController(
-            findNavController(),
-            (activity as MainActivity).appBarConfiguration
-        )
-    }
-
     private fun setupRecyclerView() {
         adapter = LocationAdapter(
             onLocationClick = { location ->
+                // TODO: Navigace na detail lokace
                 val action = LocationListFragmentDirections
-                    .actionLocationListFragmentToLocationDetailFragment(
-                        locationId = location.id,
-                        userId = targetUserId
-                    )
+                    .actionLocationListFragmentToLocationDetailFragment(location.id)
                 findNavController().navigate(action)
             },
             onEditClick = { location ->
+                // TODO: Navigace na edit fragmentu
                 val action = LocationListFragmentDirections
-                    .actionLocationListFragmentToEditLocationFragment(
-                        locationId = location.id,
-                        userId = targetUserId
-                    )
+                    .actionLocationListFragmentToEditLocationFragment(location.id)
                 findNavController().navigate(action)
             },
             onDeleteClick = { location ->

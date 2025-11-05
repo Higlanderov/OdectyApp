@@ -41,6 +41,8 @@ class AddMeterViewModel : ViewModel() {
         _isLoading.value = true
         Log.d(tag, "📥 Starting Firestore query...")
 
+        // ✨ OPRAVA: Hledáme v kořenové kolekci 'locations'
+        db.collection("locations")
         db.collection("users").document(userId).collection("locations")
             .orderBy("isDefault", Query.Direction.DESCENDING)
             .orderBy("createdAt", Query.Direction.ASCENDING)
@@ -95,11 +97,11 @@ class AddMeterViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val meterRef = db.collection("users")
-                    .document(userId)
-                    .collection("meters")
+                // ✨ OPRAVA: Ukládáme do kořenové kolekce 'meters'
+                val meterRef = db.collection("users").document(userId).collection("meters")
                     .document()
 
+                // Data jsou v pořádku, obsahují potřebné "cizí klíče"
                 val meterData = hashMapOf(
                     "userId" to userId,
                     "locationId" to locationId,

@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             user.getIdToken(true).addOnCompleteListener { task ->
                 if (!task.isSuccessful) {
-                    Log.e(tag, "Token refresh failed - possibly blocked: ${task.exception?.message}")
+                    Log.e(tag, "Token refresh failed - possibly blocked: ${'$'}{task.exception?.message}")
                     auth.signOut()
                     handleUserLogout(showBlockedMessage = true)
                 }
@@ -169,7 +169,8 @@ class MainActivity : AppCompatActivity() {
 
         appBarConfiguration = AppBarConfiguration(
             setOf(
-                R.id.mainFragment, R.id.masterUserListFragment, R.id.locationListFragment
+                R.id.masterUserListFragment, // Domov pro Mastera
+                R.id.locationListFragment  // Domov pro Usera
             ), drawerLayout
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
@@ -198,24 +199,16 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannels()
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
+            Log.d(tag, "Navigace na destinaci: ${'$'}{destination.label} (ID: ${'$'}{destination.id})")
             updateToolbarMenuVisibility(destination)
 
-            val fragmentsWithCustomTitle = setOf(
-                R.id.masterUserDetailFragment
-            )
-
-            if (destination.id in fragmentsWithCustomTitle) {
-                Log.d(tag, "Fragment ${destination.id} si nastaví title sám - MainActivity ho nepřepisuje")
-            } else {
-                destination.label?.toString()?.let {
-                    supportActionBar?.title = it
-                    Log.d(tag, "MainActivity nastavilo title: $it")
-                }
+            destination.label?.toString()?.let {
+                supportActionBar?.title = it
+                Log.d(tag, "MainActivity nastavilo title: $it")
             }
 
-            val currentDestinations = setOf(R.id.mainFragment, R.id.masterUserListFragment)
-            if (destination.id in currentDestinations) {
+            val homeDestinations = setOf(R.id.masterUserListFragment, R.id.locationListFragment)
+            if (destination.id in homeDestinations) {
                 updateNavHeader(navView)
                 Log.d(tag, "Header aktualizován po navigaci na domovskou obrazovku")
             }
@@ -313,12 +306,12 @@ class MainActivity : AppCompatActivity() {
                             switchView.isEnabled = true
 
                             // Přidej listener
-                            switchView.setOnCheckedChangeListener { buttonView, isChecked ->
+                            switchView.setOnCheckedChangeListener { _, isChecked ->
                                 Log.d(tag, "Switch changed to: $isChecked")
                                 updateHideFromMasterList(user.uid, isChecked)
                             }
 
-                            Log.d(tag, "✅ Master switch nastaven: hideFromList=$hideFromList, clickable=${switchView.isClickable}, enabled=${switchView.isEnabled}")
+                            Log.d(tag, "✅ Master switch nastaven: hideFromList=$hideFromList, clickable=${'$'}{switchView.isClickable}, enabled=${'$'}{switchView.isEnabled}")
                         } else {
                             Log.e(tag, "❌ Switch nebyl nalezen v actionView")
                         }
@@ -369,7 +362,7 @@ class MainActivity : AppCompatActivity() {
             outputStream = FileOutputStream(destinationFile)
             if (inputStream != null) {
                 inputStream.copyTo(outputStream)
-                Log.d(tag, "Obrázek zkopírován do: ${destinationFile.absolutePath}")
+                Log.d(tag, "Obrázek zkopírován do: ${'$'}{destinationFile.absolutePath}")
                 return destinationFile.absolutePath
             } else {
                 Log.e(tag, "Nepodařilo se otevřít InputStream pro URI: $sourceUri")
@@ -399,7 +392,7 @@ class MainActivity : AppCompatActivity() {
         val shouldHideBell = destination.id in hideBellOnDestinations
 
         notificationMenuItem?.isVisible = !shouldHideBell
-        Log.d(tag, "Viditelnost zvonečku nastavena na: ${!shouldHideBell}")
+        Log.d(tag, "Viditelnost zvonečku nastavena na: ${'$'}{!shouldHideBell}")
 
         updateBadgeVisibility()
     }
@@ -409,19 +402,19 @@ class MainActivity : AppCompatActivity() {
             try {
                 notificationBadge?.let { badge ->
                     val shouldShowBadge = (notificationMenuItem?.isVisible == true) && hasUnreadNotifications
-                    Log.d(tag, "updateBadgeVisibility (v post): shouldShowBadge = $shouldShowBadge (iconVisible=${notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
+                    Log.d(tag, "updateBadgeVisibility (v post): shouldShowBadge = $shouldShowBadge (iconVisible=${'$'}{notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
 
                     BadgeUtils.detachBadgeDrawable(badge, toolbar, R.id.action_notifications)
 
                     if (shouldShowBadge) {
                         BadgeUtils.attachBadgeDrawable(badge, toolbar, R.id.action_notifications)
-                        Log.d(tag, "Badge připojen s počtem: ${badge.number}")
+                        Log.d(tag, "Badge připojen s počtem: ${'$'}{badge.number}")
                     } else {
                         Log.d(tag, "Badge zůstává odpojen.")
                     }
                 }
-            } catch (e: Exception) {
-                Log.w(tag, "Chyba při (od)připojování badge: ${e.message}")
+            } catch (_: Exception) {
+                Log.w(tag, "Chyba při (od)připojování badge: ${'$'}{e.message}")
             }
         }
     }
@@ -517,7 +510,7 @@ class MainActivity : AppCompatActivity() {
                     // ✨ NOVÉ: Smaž FCM token při odhlášení
                     val currentUser = Firebase.auth.currentUser
                     if (currentUser != null) {
-                        Log.d(tag, "Mazání FCM tokenu pro uživatele: ${currentUser.uid}")
+                        Log.d(tag, "Mazání FCM tokenu pro uživatele: ${'$'}{currentUser.uid}")
                         db.collection("users").document(currentUser.uid)
                             .update("fcmToken", com.google.firebase.firestore.FieldValue.delete())
                             .addOnSuccessListener {
@@ -550,7 +543,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     return@setNavigationItemSelectedListener true
                 }
-                R.id.mainFragment, R.id.masterUserListFragment -> {
+                R.id.masterUserListFragment, R.id.locationListFragment -> {
                     navigateHome()
                     return@setNavigationItemSelectedListener true
                 }
@@ -578,7 +571,7 @@ class MainActivity : AppCompatActivity() {
         db.collection("users").document(user.uid).get()
             .addOnSuccessListener { document ->
                 val isMaster = document.getString("role") == "master"
-                val homeDestinationId = if (isMaster) R.id.masterUserListFragment else R.id.mainFragment
+                val homeDestinationId = if (isMaster) R.id.masterUserListFragment else R.id.locationListFragment
 
                 if (navController.currentDestination?.id != homeDestinationId) {
                     val navOptions = NavOptions.Builder()
@@ -597,9 +590,9 @@ class MainActivity : AppCompatActivity() {
             }
             .addOnFailureListener { e ->
                 Log.e(tag, "Chyba při zjišťování role pro navigaci domů", e)
-                if (navController.currentDestination?.id != R.id.mainFragment) {
+                if (navController.currentDestination?.id != R.id.locationListFragment) {
                     val navOptions = NavOptions.Builder().setLaunchSingleTop(true).setPopUpTo(navController.graph.findStartDestination().id, false, saveState = true).setRestoreState(true).build()
-                    navController.navigate(R.id.mainFragment, null, navOptions)
+                    navController.navigate(R.id.locationListFragment, null, navOptions)
                 }
             }
     }
@@ -681,7 +674,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadGoogleOrDefaultImage(imageView: ImageView, user: com.google.firebase.auth.FirebaseUser) {
         if (user.photoUrl != null) {
-            Log.d(tag, "Načítám profilový obrázek z Google URL pro ${user.uid}")
+            Log.d(tag, "Načítám profilový obrázek z Google URL pro ${'$'}{user.uid}")
             imageView.load(user.photoUrl) {
                 crossfade(true)
                 placeholder(R.drawable.ic_profile)
