@@ -1,7 +1,9 @@
 package cz.davidfryda.odectyapp.data
 
+
 data class FullReadingData(
     val user: UserData,
     val meter: Meter?,
-    val reading: Reading?
+    val reading: Reading?,
+    val location: Location
 )

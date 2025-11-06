@@ -51,7 +51,7 @@ class NotificationListFragment : BottomSheetDialogFragment(), NotificationClickL
             Log.d(tag, "Odložené spuštění markAllAsRead.")
             viewModel.markAllAsRead()
         }
-        handler.postDelayed(markReadRunnable!!, 3000)
+        handler.postDelayed(markReadRunnable!!, 1500)
     }
 
     override fun onNotificationClicked(notification: NotificationItem) {
