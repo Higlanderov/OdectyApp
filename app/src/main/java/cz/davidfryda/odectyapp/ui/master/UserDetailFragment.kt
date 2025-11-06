@@ -252,9 +252,9 @@ class UserDetailFragment : Fragment(), OnMapReadyCallback {
             when (result) {
                 is SaveResult.Success -> {
                     val messageResId = if (!currentUserIsDisabled) {
-                        R.string.user_blocked_successfully
-                    } else {
                         R.string.user_unblocked_successfully
+                    } else {
+                        R.string.user_blocked_successfully
                     }
                     Log.d(tag, "Block operation successful. MessageResId = $messageResId (based on previous state: $currentUserIsDisabled)")
 

@@ -1,6 +1,7 @@
 package cz.davidfryda.odectyapp.ui.user
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -40,6 +41,8 @@ class UserInfoFragment : Fragment() {
             // Kontrola všech polí
             if (name.isNotEmpty() && surname.isNotEmpty() && address.isNotEmpty() && phone.isNotEmpty()) {
                 // Voláme upravenou funkci (email si vezme sama z Auth)
+                // Toto je okamžik, kdy se záznam v databázi SKUTEČNĚ VYTVOŘÍ.
+                // Uživatel je již přihlášen, takže pravidla Firestore projdou.
                 viewModel.saveOrUpdateUser(name, surname, address, phone)
             } else {
                 Toast.makeText(context, "Prosím, vyplňte všechna pole.", Toast.LENGTH_SHORT).show()
@@ -53,8 +56,25 @@ class UserInfoFragment : Fragment() {
 
             when (result) {
                 is SaveResult.Success -> {
-                    // Po úspěšném uložení navigujeme dál
-                    findNavController().navigate(R.id.action_userInfoFragment_to_mainFragment)
+                    Toast.makeText(context, "Informace uloženy", Toast.LENGTH_SHORT).show()
+
+                    // ✨ OPRAVA NAVIGACE:
+                    // Po úspěšném uložení navigujeme na domovskou obrazovku běžného uživatele.
+                    try {
+                        // Ujistěte se, že v nav_graph.xml máte tuto akci:
+                        // <fragment android:id="@+id/userInfoFragment" ...>
+                        //    <action
+                        //       android:id="@+id/action_userInfoFragment_to_locationListFragment"
+                        //       app:destination="@id/locationListFragment"
+                        //       app:popUpTo="@id/nav_graph"
+                        //       app:popUpToInclusive="true" />
+                        // </fragment>
+                        findNavController().navigate(R.id.action_userInfoFragment_to_locationListFragment)
+                    } catch (e: Exception) {
+                        Log.e("UserInfoFragment", "Navigace selhala. Chybí akce 'action_userInfoFragment_to_locationListFragment' v nav_graph.xml?", e)
+                        // Nouzový návrat na Splash, který uživatele přesměruje správně
+                        findNavController().navigate(R.id.action_global_splashFragment)
+                    }
                     viewModel.resetSaveResult()
                 }
                 is SaveResult.Error -> {

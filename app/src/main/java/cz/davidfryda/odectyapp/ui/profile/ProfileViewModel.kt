@@ -6,103 +6,92 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.SetOptions // <-- DŮLEŽITÝ IMPORT
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.data.UserData
-import cz.davidfryda.odectyapp.ui.user.SaveResult
+import cz.davidfryda.odectyapp.ui.user.SaveResult // Používáme SaveResult
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class ProfileViewModel : ViewModel() {
+
     private val db = Firebase.firestore
-    private val currentUser = Firebase.auth.currentUser
+    private val auth = Firebase.auth
     private val tag = "ProfileViewModel"
 
-    private val _userData = MutableLiveData<UserData?>()
-    val userData: LiveData<UserData?> = _userData
+    private val _userData = MutableLiveData<UserData>()
+    val userData: LiveData<UserData> = _userData
 
-    private val _saveResult = MutableLiveData<SaveResult>(SaveResult.Idle)
+    private val _saveResult = MutableLiveData<SaveResult>()
     val saveResult: LiveData<SaveResult> = _saveResult
 
-    // Načtení dat (automaticky načte i nový e-mail)
+    private val _isLoading = MutableLiveData<Boolean>()
+    val isLoading: LiveData<Boolean> = _isLoading
+
+    /**
+     * Načte data aktuálně přihlášeného uživatele.
+     */
     fun loadUserData() {
-        val user = currentUser
-        if (user == null) {
-            Log.w(tag, "loadUserData: Aktuální uživatel je null.")
-            _userData.value = null
-            return
-        }
-        val userId = user.uid
-        Log.d(tag, "loadUserData: Načítám data pro uživatele $userId")
+        val userId = auth.currentUser?.uid ?: return
+        _isLoading.value = true
         db.collection("users").document(userId).get()
             .addOnSuccessListener { document ->
-                _userData.value = document.toObject(UserData::class.java)
-                if (_userData.value != null) {
-                    Log.d(tag, "loadUserData: Data uživatele načtena úspěšně.")
-                } else {
-                    Log.w(tag, "loadUserData: Dokument uživatele $userId nenalezen, je prázdný nebo se nepodařilo převést na UserData.")
-                    _userData.value = null
+                document.toObject(UserData::class.java)?.let {
+                    _userData.value = it
                 }
+                _isLoading.value = false
             }
             .addOnFailureListener { e ->
-                Log.e(tag, "loadUserData: Chyba při načítání dat uživatele.", e)
-                _userData.value = null
+                Log.e(tag, "Chyba při načítání dat uživatele", e)
+                _isLoading.value = false
             }
     }
 
-    // Uložení nebo aktualizace dat
+    /**
+     * Vytvoří nebo aktualizuje data uživatele v databázi.
+     * Tuto funkci volá UserInfoFragment po registraci.
+     */
     fun saveOrUpdateUser(name: String, surname: String, address: String, phone: String) {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            _saveResult.value = SaveResult.Error("Uživatel není přihlášen")
+            return
+        }
+
+        _saveResult.value = SaveResult.Loading
         viewModelScope.launch {
-            _saveResult.value = SaveResult.Loading
-            val user = currentUser
-            if (user == null) {
-                _saveResult.value = SaveResult.Error("Uživatel není přihlášen.")
-                return@launch
-            }
-            val userId = user.uid
-
-            // --- START ZMĚNY ---
-            // Získáme e-mail z Auth a přidáme ho do mapy pro uložení
-            val email = user.email ?: "" // Získáme e-mail přihlášeného uživatele
-
-            val userMap = mapOf(
-                "name" to name,
-                "surname" to surname,
-                "address" to address,
-                "phoneNumber" to phone,
-                "email" to email // <-- PŘIDÁNO ULOŽENÍ E-MAILU
-            )
-            // --- KONEC ZMĚNY ---
-
             try {
-                // Použití .set() s merge zajistí, že se aktualizují POUZE pole v mapě
-                db.collection("users").document(userId)
-                    .set(userMap, SetOptions.merge()) // <-- Používáme MERGE
-                    .await()
+                val userDocRef = db.collection("users").document(currentUser.uid)
+
+                // Připravíme data
+                val userData = hashMapOf(
+                    "uid" to currentUser.uid,
+                    "email" to currentUser.email!!,
+                    "name" to name,
+                    "surname" to surname,
+                    "address" to address,
+                    "phoneNumber" to phone,
+                    "role" to "user", // Výchozí role
+                    "isDisabled" to false,
+                    "createdAt" to FieldValue.serverTimestamp() // Nastaví se jen při vytvoření
+                )
+
+                // Použijeme SetOptions.merge(), aby se data vytvořila
+                // (pokud neexistují) nebo aktualizovala (pokud existují).
+                // Tím pokryjeme i případné selhání při registraci přes Google.
+                userDocRef.set(userData, SetOptions.merge()).await()
 
                 _saveResult.value = SaveResult.Success
-                Log.d(tag, "saveOrUpdateUser: Data uživatele $userId úspěšně uložena.")
-
-                // Aktualizujeme lokální data
-                _userData.value = _userData.value?.copy(
-                    name = name,
-                    surname = surname,
-                    address = address,
-                    phoneNumber = phone,
-                    email = email // <-- Aktualizace lokálního e-mailu
-                ) ?: UserData(userId, name, surname, address, phone, email) // Fallback
-
             } catch (e: Exception) {
-                _saveResult.value = SaveResult.Error(e.message ?: "Chyba při ukládání.")
-                Log.e(tag, "saveOrUpdateUser: Chyba při ukládání dat uživatele $userId.", e)
+                Log.e(tag, "Chyba při ukládání dat uživatele", e)
+                _saveResult.value = SaveResult.Error(e.message ?: "Neznámá chyba")
             }
         }
     }
 
-    // Reset stavu
     fun resetSaveResult() {
         _saveResult.value = SaveResult.Idle
-        Log.d(tag,"resetSaveResult: Stav resetován na Idle.")
     }
 }

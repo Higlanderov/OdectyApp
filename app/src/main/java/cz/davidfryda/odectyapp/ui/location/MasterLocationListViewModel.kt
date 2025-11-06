@@ -5,7 +5,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.ktx.auth // Používá se
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -13,38 +12,32 @@ import cz.davidfryda.odectyapp.data.Location
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-class LocationListViewModel : ViewModel() {
+class MasterLocationListViewModel : ViewModel() {
     private val db = Firebase.firestore
-    private val tag = "LocationListViewModel"
-    private val auth = Firebase.auth // Přidáno pro ID
+    private val tag = "MasterLocationListVM" // Změněn tag
 
     private val _locations = MutableLiveData<List<Location>>()
-    val locations: LiveData<List<Location>>
-        get() = _locations
+    val locations: LiveData<List<Location>> = _locations
 
     private val _isLoading = MutableLiveData<Boolean>()
-    val isLoading: LiveData<Boolean>
-        get() = _isLoading
+    val isLoading: LiveData<Boolean> = _isLoading
 
-    private val _deleteResult = MutableLiveData<DeleteResult>()
-    val deleteResult: LiveData<DeleteResult>
-        get() = _deleteResult
+    private val _deleteResult = MutableLiveData<LocationListViewModel.DeleteResult>()
+    val deleteResult: LiveData<LocationListViewModel.DeleteResult> = _deleteResult
 
-    private val _setDefaultResult = MutableLiveData<SetDefaultResult>()
-    val setDefaultResult: LiveData<SetDefaultResult>
-        get() = _setDefaultResult
+    private val _setDefaultResult = MutableLiveData<LocationListViewModel.SetDefaultResult>()
+    val setDefaultResult: LiveData<LocationListViewModel.SetDefaultResult> = _setDefaultResult
 
-    // Není potřeba, ID se bere přímo
-    // private var targetUserId: String? = null
+    // ID uživatele, pro kterého pracujeme
+    private var targetUserId: String? = null
 
-    // Původní funkce `loadLocations` je nyní správná
-    fun loadLocations() {
-        val userId = auth.currentUser?.uid // Vždy jen přihlášený uživatel
-        if (userId == null) {
-            Log.e(tag, "User not logged in")
-            _locations.value = emptyList()
-            return
-        }
+    /**
+     * Načte lokace pro konkrétního uživatele (režim Master).
+     */
+    fun loadLocationsForUser(userId: String) {
+        // Zde už není fallback, userId je povinné
+        this.targetUserId = userId
+        Log.d(tag, "Načítám lokace pro uživatele: $userId")
 
         _isLoading.value = true
 
@@ -55,7 +48,7 @@ class LocationListViewModel : ViewModel() {
                 _isLoading.value = false
 
                 if (error != null) {
-                    Log.e(tag, "Error loading locations", error)
+                    Log.e(tag, "Error loading locations for $userId", error)
                     _locations.value = emptyList()
                     return@addSnapshotListener
                 }
@@ -90,10 +83,12 @@ class LocationListViewModel : ViewModel() {
         }
     }
 
+    // Funkce pro mazání a nastavení výchozí jsou stejné,
+    // jen musíme zajistit, že používají `targetUserId`
+
     fun deleteLocation(locationId: String) {
-        val userId = auth.currentUser?.uid // Vždy jen přihlášený uživatel
-        if (userId == null) {
-            _deleteResult.value = DeleteResult.Error("User not logged in")
+        if (targetUserId == null) {
+            _deleteResult.value = LocationListViewModel.DeleteResult.Error("User ID není nastaveno")
             return
         }
 
@@ -101,43 +96,42 @@ class LocationListViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val metersSnapshot = db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!)
                     .collection("meters")
                     .whereEqualTo("locationId", locationId)
                     .get()
                     .await()
 
                 if (metersSnapshot.size() > 0) {
-                    _deleteResult.value = DeleteResult.Error(
-                        "Nelze smazat místo s měřáky. Nejdřív přesuňte nebo smažte všechny měřáky."
+                    _deleteResult.value = LocationListViewModel.DeleteResult.Error(
+                        "Nelze smazat místo s měřáky."
                     )
                     _isLoading.value = false
                     return@launch
                 }
 
                 db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!)
                     .collection("locations")
                     .document(locationId)
                     .delete()
                     .await()
 
-                Log.d(tag, "Location $locationId deleted successfully")
-                _deleteResult.value = DeleteResult.Success
+                Log.d(tag, "Location $locationId deleted for user $targetUserId")
+                _deleteResult.value = LocationListViewModel.DeleteResult.Success
                 _isLoading.value = false
 
             } catch (e: Exception) {
                 Log.e(tag, "Error deleting location", e)
-                _deleteResult.value = DeleteResult.Error(e.message ?: "Unknown error")
+                _deleteResult.value = LocationListViewModel.DeleteResult.Error(e.message ?: "Unknown error")
                 _isLoading.value = false
             }
         }
     }
 
     fun setAsDefault(locationId: String) {
-        val userId = auth.currentUser?.uid // Vždy jen přihlášený uživatel
-        if (userId == null) {
-            _setDefaultResult.value = SetDefaultResult.Error("User not logged in")
+        if (targetUserId == null) {
+            _setDefaultResult.value = LocationListViewModel.SetDefaultResult.Error("User ID není nastaveno")
             return
         }
 
@@ -145,7 +139,7 @@ class LocationListViewModel : ViewModel() {
             _isLoading.value = true
             try {
                 val currentDefaultSnapshot = db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!)
                     .collection("locations")
                     .whereEqualTo("isDefault", true)
                     .get()
@@ -156,46 +150,33 @@ class LocationListViewModel : ViewModel() {
                 }
 
                 db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!)
                     .collection("locations")
                     .document(locationId)
                     .update("isDefault", true)
                     .await()
 
                 db.collection("users")
-                    .document(userId)
+                    .document(targetUserId!!)
                     .update("defaultLocationId", locationId)
                     .await()
 
-                Log.d(tag, "Location $locationId set as default")
-                _setDefaultResult.value = SetDefaultResult.Success
+                Log.d(tag, "Location $locationId set as default for user $targetUserId")
+                _setDefaultResult.value = LocationListViewModel.SetDefaultResult.Success
                 _isLoading.value = false
 
             } catch (e: Exception) {
                 Log.e(tag, "Error setting default location", e)
-                _setDefaultResult.value = SetDefaultResult.Error(e.message ?: "Unknown error")
+                _setDefaultResult.value = LocationListViewModel.SetDefaultResult.Error(e.message ?: "Unknown error")
                 _isLoading.value = false
             }
         }
     }
 
-    fun resetDeleteResult() {
-        _deleteResult.value = DeleteResult.Idle
-    }
+    // Resetovací funkce mohou zůstat stejné
+    fun resetDeleteResult() { _deleteResult.value = LocationListViewModel.DeleteResult.Idle }
+    fun resetSetDefaultResult() { _setDefaultResult.value = LocationListViewModel.SetDefaultResult.Idle }
 
-    fun resetSetDefaultResult() {
-        _setDefaultResult.value = SetDefaultResult.Idle
-    }
-
-    sealed class DeleteResult {
-        object Idle : DeleteResult()
-        object Success : DeleteResult()
-        data class Error(val message: String) : DeleteResult()
-    }
-
-    sealed class SetDefaultResult {
-        object Idle : SetDefaultResult()
-        object Success : SetDefaultResult()
-        data class Error(val message: String) : SetDefaultResult()
-    }
+    // Používáme stejné sealed classes jako LocationListViewModel
+    // (Nebo si můžete vytvořit vlastní, ale není to nutné)
 }

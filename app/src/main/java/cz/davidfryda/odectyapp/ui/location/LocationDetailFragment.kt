@@ -13,12 +13,18 @@ import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Meter
+import cz.davidfryda.odectyapp.databinding.DialogAddDescriptionBinding
 import cz.davidfryda.odectyapp.databinding.FragmentLocationDetailBinding
 import cz.davidfryda.odectyapp.ui.main.MeterAdapter
 import cz.davidfryda.odectyapp.ui.main.MeterInteractionListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class LocationDetailFragment : Fragment(), MeterInteractionListener {
 
@@ -30,6 +36,8 @@ class LocationDetailFragment : Fragment(), MeterInteractionListener {
 
     private lateinit var meterAdapter: MeterAdapter
     private var targetUserId: String? = null
+    private var isMasterMode: Boolean = false
+    private val db = Firebase.firestore
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -43,7 +51,13 @@ class LocationDetailFragment : Fragment(), MeterInteractionListener {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        // Určení target userId - buď z argumentů nebo current user
         targetUserId = args.userId ?: Firebase.auth.currentUser?.uid
+        val currentUserId = Firebase.auth.currentUser?.uid
+
+        // ✨ DŮLEŽITÉ: Určení, zda jsme v master režimu
+        // Master režim = díváme se na data jiného uživatele
+        isMasterMode = targetUserId != null && targetUserId != currentUserId
 
         if (targetUserId == null) {
             Toast.makeText(context, "Chyba: Uživatel není přihlášen", Toast.LENGTH_LONG).show()
@@ -59,10 +73,21 @@ class LocationDetailFragment : Fragment(), MeterInteractionListener {
     }
 
     private fun setupUI() {
+        // ✨ OPRAVA: Správné nastavení parametrů pro MeterAdapter
         meterAdapter = MeterAdapter().apply {
             listener = this@LocationDetailFragment
             currentLocationId = args.locationId
-            ownerId = if (targetUserId != Firebase.auth.currentUser?.uid) targetUserId else null
+
+            // Klíčové nastavení pro správné zobrazení:
+            if (isMasterMode) {
+                // Master se dívá na cizí měřáky
+                ownerId = targetUserId  // ID vlastníka měřáků
+                isMasterOwnProfile = false  // NENÍ to masterův vlastní profil
+            } else {
+                // Běžný uživatel se dívá na své měřáky
+                ownerId = null  // Null znamená běžný uživatelský režim
+                isMasterOwnProfile = false
+            }
         }
 
         binding.metersRecyclerView.apply {
@@ -70,45 +95,124 @@ class LocationDetailFragment : Fragment(), MeterInteractionListener {
             layoutManager = LinearLayoutManager(context)
         }
 
-        binding.editButton.setOnClickListener {
-            val action = LocationDetailFragmentDirections
-                .actionLocationDetailFragmentToEditLocationFragment(
-                    locationId = args.locationId,
-                    userId = targetUserId
-                )
-            findNavController().navigate(action)
-        }
+        // ✨ Skrýt editační tlačítka v master režimu (když se díváme na cizí lokaci)
+        binding.editButton.isVisible = !isMasterMode
+        binding.deleteButton.isVisible = !isMasterMode
+        binding.fabAddMeter.isVisible = !isMasterMode
 
-        binding.deleteButton.setOnClickListener {
-            showDeleteLocationDialog()
-        }
+        if (!isMasterMode) {
+            binding.editButton.setOnClickListener {
+                val action = LocationDetailFragmentDirections
+                    .actionLocationDetailFragmentToEditLocationFragment(
+                        locationId = args.locationId,
+                        userId = targetUserId
+                    )
+                findNavController().navigate(action)
+            }
 
-        binding.fabAddMeter.setOnClickListener {
-            val action = LocationDetailFragmentDirections
-                .actionLocationDetailFragmentToAddMeterFragment(
-                    preselectedLocationId = args.locationId,
-                    userId = targetUserId
-                )
-            findNavController().navigate(action)
+            binding.deleteButton.setOnClickListener {
+                showDeleteLocationDialog()
+            }
+
+            binding.fabAddMeter.setOnClickListener {
+                val action = LocationDetailFragmentDirections
+                    .actionLocationDetailFragmentToAddMeterFragment(
+                        preselectedLocationId = args.locationId,
+                        userId = targetUserId
+                    )
+                findNavController().navigate(action)
+            }
         }
     }
 
     override fun onEditMeterClicked(meter: Meter) {
-        val action = LocationDetailFragmentDirections
-            .actionLocationDetailFragmentToEditMeterFragment(
-                meterId = meter.id,
-                locationId = args.locationId,
-                userId = targetUserId
-            )
-        findNavController().navigate(action)
+        // ✨ Editace pouze pro vlastní měřáky
+        if (!isMasterMode) {
+            val action = LocationDetailFragmentDirections
+                .actionLocationDetailFragmentToEditMeterFragment(
+                    meterId = meter.id,
+                    locationId = args.locationId,
+                    userId = targetUserId
+                )
+            findNavController().navigate(action)
+        } else {
+            Toast.makeText(context, R.string.cannot_edit_in_master_mode, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDeleteMeterClicked(meter: Meter) {
-        showDeleteMeterDialog(meter)
+        // ✨ Mazání pouze pro vlastní měřáky
+        if (!isMasterMode) {
+            showDeleteMeterDialog(meter)
+        } else {
+            Toast.makeText(context, R.string.cannot_delete_in_master_mode, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onAddDescriptionClicked(meter: Meter, ownerUserId: String) {
-        Toast.makeText(context, "Přidání popisu není dostupné", Toast.LENGTH_SHORT).show()
+        // ✨ NOVÁ IMPLEMENTACE: Zobrazit dialog pro přidání/editaci master popisu
+        if (isMasterMode) {
+            showAddDescriptionDialog(meter, ownerUserId)
+        }
+    }
+
+    // ✨ NOVÁ METODA: Dialog pro přidání master popisu
+    private fun showAddDescriptionDialog(meter: Meter, ownerUserId: String) {
+        val dialogBinding = DialogAddDescriptionBinding.inflate(layoutInflater)
+
+        // Předvyplnit existující popis, pokud existuje
+        dialogBinding.editDescriptionEditText.setText(meter.masterDescription ?: "")
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.add_description_dialog_title, meter.name))
+            .setView(dialogBinding.root)
+            .create()
+
+        dialogBinding.dialogSaveButton.setOnClickListener {
+            val newDescription = dialogBinding.editDescriptionEditText.text.toString().trim()
+
+            // Uložit popis do Firestore
+            saveMasterDescription(meter.id, ownerUserId, newDescription) { success ->
+                if (success) {
+                    Toast.makeText(context, R.string.save_description_success, Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                    // Znovu načíst měřáky pro zobrazení aktualizovaného popisu
+                    viewModel.loadMeters(ownerUserId, args.locationId)
+                } else {
+                    Toast.makeText(context, getString(R.string.save_description_error, "Neznámá chyba"), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        dialogBinding.dialogCancelButton.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    // ✨ NOVÁ METODA: Uložení master popisu do Firestore
+    private fun saveMasterDescription(meterId: String, userId: String, description: String, callback: (Boolean) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Aktualizovat masterDescription v dokumentu měřáku
+                db.collection("users")
+                    .document(userId)
+                    .collection("meters")
+                    .document(meterId)
+                    .update("masterDescription", description.ifEmpty { null })
+                    .await()
+
+                CoroutineScope(Dispatchers.Main).launch {
+                    callback(true)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                CoroutineScope(Dispatchers.Main).launch {
+                    callback(false)
+                }
+            }
+        }
     }
 
     private fun setupObservers() {

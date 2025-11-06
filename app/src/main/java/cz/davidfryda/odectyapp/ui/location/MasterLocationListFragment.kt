@@ -1,8 +1,7 @@
-// Umístění: app/src/main/java/cz/davidfryda/odectyapp/ui/location/LocationListFragment.kt
-
 package cz.davidfryda.odectyapp.ui.location
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,63 +10,87 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
-// import androidx.navigation.fragment.navArgs // Není potřeba
+import androidx.navigation.fragment.navArgs
 import androidx.recyclerview.widget.DividerItemDecoration
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Location
-import cz.davidfryda.odectyapp.databinding.FragmentLocationListBinding
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.ktx.Firebase
+import cz.davidfryda.odectyapp.databinding.FragmentMasterLocationListBinding
 
-class LocationListFragment : Fragment() {
+class MasterLocationListFragment : Fragment() {
 
-    private var _binding: FragmentLocationListBinding? = null
+    // Používáme binding pro 'fragment_master_location_list.xml'
+    private var _binding: FragmentMasterLocationListBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: LocationListViewModel by viewModels()
+    // Používáme vámi vytvořený ViewModel
+    private val viewModel: MasterLocationListViewModel by viewModels()
     private lateinit var adapter: LocationAdapter
 
-    // Není potřeba
-    // private val args: LocationListFragmentArgs by navArgs()
-    // private var currentUserId: String? = null
+    // Používáme argumenty pro tento fragment
+    private val args: MasterLocationListFragmentArgs by navArgs()
+    private lateinit var currentUserId: String // ID je zde povinné
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        _binding = FragmentLocationListBinding.inflate(inflater, container, false)
+        // Inflate pomocí správného bindingu
+        _binding = FragmentMasterLocationListBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Není potřeba žádná logika pro ActionBar/Drawer
+        // Načteme povinné ID uživatele
+        currentUserId = args.userId
+        Log.d("MasterLocationList", "Zobrazení lokací pro userId: $currentUserId")
+
+        val masterId = Firebase.auth.currentUser?.uid
+
+        if (masterId != null && masterId == currentUserId) {
+            // Master se dívá na svůj vlastní profil
+            Log.d("MasterLocationList", "Master se dívá na svá data. Zobrazuji FAB.")
+            binding.fabAddLocation.isVisible = true
+            binding.fabAddLocation.setOnClickListener {
+                // Navigujeme na AddLocationFragment.
+                // Předáme 'masterId', aby AddLocationFragment věděl, komu lokaci přidat.
+                val action = MasterLocationListFragmentDirections
+                    .actionMasterLocationListFragmentToAddLocationFragment(masterId)
+                findNavController().navigate(action)
+            }
+        } else {
+            // Master se dívá na cizí profil
+            Log.d("MasterLocationList", "Master se dívá na cizí data. Skrývám FAB.")
+            binding.fabAddLocation.isVisible = false
+        }
 
         setupRecyclerView()
         setupObservers()
 
-        binding.fabAddLocation.setOnClickListener {
-            // Použije akci bez argumentů (nebo s null, jak je v nav_graph)
-            findNavController().navigate(R.id.action_locationListFragment_to_addLocationFragment)
-        }
+        // V tomto fragmentu není FAB pro přidávání lokací, takže listener není potřeba.
 
-        // Volá jednoduchou funkci
-        viewModel.loadLocations()
+        // Načteme data pro konkrétního uživatele
+        viewModel.loadLocationsForUser(currentUserId)
     }
 
     private fun setupRecyclerView() {
+        // LocationAdapter je znovupoužitelný
         adapter = LocationAdapter(
             onLocationClick = { location ->
-                // Akce předává jen locationId
-                val action = LocationListFragmentDirections
-                    .actionLocationListFragmentToLocationDetailFragment(location.id, null) // userId je null
+                // Navigace pomocí akce definované v nav_graph.xml
+                val action = MasterLocationListFragmentDirections
+                    .actionMasterLocationListFragmentToLocationDetailFragment(location.id, currentUserId)
                 findNavController().navigate(action)
             },
             onEditClick = { location ->
-                // Akce předává jen locationId
-                val action = LocationListFragmentDirections
-                    .actionLocationListFragmentToEditLocationFragment(location.id, null) // userId je null
+                // Navigace pomocí akce definované v nav_graph.xml
+                val action = MasterLocationListFragmentDirections
+                    .actionMasterLocationListFragmentToEditLocationFragment(location.id, currentUserId)
                 findNavController().navigate(action)
             },
             onDeleteClick = { location ->
@@ -88,6 +111,7 @@ class LocationListFragment : Fragment() {
         viewModel.locations.observe(viewLifecycleOwner) { locations ->
             adapter.submitList(locations)
             val isEmpty = locations.isEmpty()
+            // Ujistěte se, že ID v layoutu odpovídají (progress_bar, empty_state_layout, locations_recycler_view)
             binding.emptyStateLayout.isVisible = isEmpty && viewModel.isLoading.value != true
             binding.locationsRecyclerView.isVisible = !isEmpty
         }
@@ -96,6 +120,8 @@ class LocationListFragment : Fragment() {
             binding.progressBar.isVisible = isLoading
         }
 
+        // Zde používáme sealed classes z LocationListViewModel, jak je definováno
+        // ve vašem MasterLocationListViewModel.kt
         viewModel.deleteResult.observe(viewLifecycleOwner) { result ->
             when (result) {
                 is LocationListViewModel.DeleteResult.Success -> {

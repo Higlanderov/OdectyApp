@@ -215,6 +215,17 @@
     <string name="meter_updated_successfully">Měřák aktualizován</string>
     <string name="error_loading_meter">Chyba při načítání měřáku</string>
     <string name="loading">Načítání</string>
+    <string name="no_locations_found">Zatím žádná místa</string>
+    <string name="no_locations_found_for_user">Pro tohoto uživatele nebyla nalezena žádná místa</string>
+    <string name="no_locations_instructions_user">Uživatel si musí nejprve přidat odběrná místa ve své aplikaci.</string>
+    <!-- Master mode messages - pro LocationListFragment -->
+    <string name="cannot_edit_in_master_mode">V režimu správce nelze upravovat lokace jiných uživatelů</string>
+    <string name="cannot_delete_in_master_mode">V režimu správce nelze mazat lokace jiných uživatelů</string>
+    <string name="cannot_set_default_in_master_mode">V režimu správce nelze měnit výchozí lokaci jiných uživatelů</string>
+
+    <!-- Location item -->
+    <string name="meter_count_format">Počet měřáků: %d</string>
+
 
     <string-array name="months_array">
         <item>Leden</item>

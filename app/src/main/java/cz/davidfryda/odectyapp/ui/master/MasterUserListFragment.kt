@@ -312,7 +312,7 @@ class MasterUserListFragment : Fragment() {
         // ✨ NOVÉ: Kliknutí na celou kartu → navigace na lokace
         userAdapter.setOnUserClickListener { userWithStatus ->
             val action = MasterUserListFragmentDirections
-                .actionMasterUserListFragmentToLocationListFragment(userId = userWithStatus.user.uid)
+                .actionMasterUserListFragmentToMasterLocationListFragment(userId = userWithStatus.user.uid)
             findNavController().navigate(action)
         }
 
