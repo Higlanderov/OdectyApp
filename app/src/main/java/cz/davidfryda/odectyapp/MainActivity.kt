@@ -2,7 +2,11 @@ package cz.davidfryda.odectyapp
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Context
 import android.graphics.Color
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkRequest
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -10,7 +14,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
@@ -77,6 +80,11 @@ class MainActivity : AppCompatActivity() {
 
     private val tag = "MainActivity"
 
+    // === Proměnné pro Offline Banner ===
+    private lateinit var connectivityManager: ConnectivityManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var offlineIndicator: TextView? = null
+
     private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
         val user = firebaseAuth.currentUser
         if (user == null) {
@@ -92,13 +100,31 @@ class MainActivity : AppCompatActivity() {
                 handleUserLogout(showBlockedMessage = false)
             }
         } else {
-            user.getIdToken(true).addOnCompleteListener { task ->
-                if (!task.isSuccessful) {
-                    Log.e(tag, "Token refresh failed - possibly blocked: ${'$'}{task.exception?.message}")
-                    auth.signOut()
-                    handleUserLogout(showBlockedMessage = true)
+            // === ZAČÁTEK OPAVY (Offline Check) ===
+            // Nyní zkontrolujeme, zda je zařízení online, NEŽ vynutíme refresh tokenu.
+            // Musíme mít jistotu, že connectivityManager již existuje.
+            // Tato kontrola proběhne až po onCreate, takže by to mělo být v pořádku.
+            if (::connectivityManager.isInitialized) {
+                val activeNetwork = connectivityManager.activeNetwork
+                if (activeNetwork != null) {
+                    // Jsme online, můžeme zkontrolovat platnost tokenu (např. zablokovaný účet).
+                    user.getIdToken(true).addOnCompleteListener { task ->
+                        if (!task.isSuccessful) {
+                            Log.e(tag, "Token refresh failed - possibly blocked: ${task.exception?.message}")
+                            auth.signOut()
+                            handleUserLogout(showBlockedMessage = true)
+                        }
+                    }
+                } else {
+                    // Jsme offline. Nebudeme vynucovat refresh tokenu, který by selhal.
+                    // Důvěřujeme kešovanému přihlášení.
+                    Log.d(tag, "Offline, skipping token refresh check.")
                 }
+            } else {
+                // Pojistka, pokud by listener běžel dříve než inicializace (velmi nepravděpodobné)
+                Log.w(tag, "ConnectivityManager not initialized, skipping token check.")
             }
+            // === KONEC OPAVY (Offline Check) ===
         }
     }
 
@@ -153,7 +179,7 @@ class MainActivity : AppCompatActivity() {
         val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
         ViewCompat.setOnApplyWindowInsetsListener(drawerLayout) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            val mainContentContainer: LinearLayout? = view.findViewById(R.id.main_content_container)
+            val mainContentContainer: View? = view.findViewById(R.id.main_content_container)
             mainContentContainer?.setPadding(systemBars.left, systemBars.top, systemBars.right, 0)
             insets
         }
@@ -199,7 +225,7 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannels()
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            Log.d(tag, "Navigace na destinaci: ${'$'}{destination.label} (ID: ${'$'}{destination.id})")
+            Log.d(tag, "Navigace na destinaci: ${destination.label} (ID: ${destination.id})")
             updateToolbarMenuVisibility(destination)
 
             destination.label?.toString()?.let {
@@ -216,48 +242,107 @@ class MainActivity : AppCompatActivity() {
 
         scheduleNotificationWorker()
 
+        // Inicializace Offline Banneru (musí být před přidáním authStateListener)
+        setupOfflineIndicator()
+
+        // Přidání listeneru (nyní již connectivityManager existuje)
         auth.addAuthStateListener(authStateListener)
     }
 
     private fun createNotificationChannels() {
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
-            val readingsChannel = NotificationChannel(
-                "new_readings",
-                "Nové odečty",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Upozornění na nové odečty uživatelů"
-                enableLights(true)
-                lightColor = Color.BLUE
-                enableVibration(true)
-            }
-
-            val monthlyRemindersChannel = NotificationChannel(
-                "monthly_reminders",
-                "Měsíční připomínky",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Připomínky k odeslání měsíčních odečtů"
-                enableLights(true)
-                lightColor = Color.GREEN
-                enableVibration(true)
-            }
-
-            val localRemindersChannel = NotificationChannel(
-                "reading_reminder_channel",
-                "Lokální připomínky odečtů",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Záložní kanál pro lokální připomínky k provedení odečtu"
-            }
-
-            notificationManager.createNotificationChannel(readingsChannel)
-            notificationManager.createNotificationChannel(monthlyRemindersChannel)
-            notificationManager.createNotificationChannel(localRemindersChannel)
-
-            Log.d(tag, "✅ Všechny notifikační kanály vytvořeny (včetně monthly_reminders)")
+        val readingsChannel = NotificationChannel(
+            "new_readings",
+            "Nové odečty",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Upozornění na nové odečty uživatelů"
+            enableLights(true)
+            lightColor = Color.BLUE
+            enableVibration(true)
         }
+
+        val monthlyRemindersChannel = NotificationChannel(
+            "monthly_reminders",
+            "Měsíční připomínky",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Připomínky k odeslání měsíčních odečtů"
+            enableLights(true)
+            lightColor = Color.GREEN
+            enableVibration(true)
+        }
+
+        val localRemindersChannel = NotificationChannel(
+            "reading_reminder_channel",
+            "Lokální připomínky odečtů",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Záložní kanál pro lokální připomínky k provedení odečtu"
+        }
+
+        notificationManager.createNotificationChannel(readingsChannel)
+        notificationManager.createNotificationChannel(monthlyRemindersChannel)
+        notificationManager.createNotificationChannel(localRemindersChannel)
+
+        Log.d(tag, "✅ Všechny notifikační kanály vytvořeny (včetně monthly_reminders)")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Registrujeme callback při návratu do aktivity
+        networkCallback?.let {
+            val networkRequest = NetworkRequest.Builder().build()
+            connectivityManager.registerNetworkCallback(networkRequest, it)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Odregistrujeme callback při opuštění aktivity, abychom předešli leakům
+        networkCallback?.let {
+            connectivityManager.unregisterNetworkCallback(it)
+        }
+    }
+
+    private fun setupOfflineIndicator() {
+        // 1. Najdeme náš banner
+        offlineIndicator = findViewById(R.id.textViewOfflineIndicator)
+
+        // 2. Inicializujeme ConnectivityManager
+        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // 3. Definujeme NetworkCallback
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                // Síť je dostupná, skryjeme banner
+                runOnUiThread {
+                    offlineIndicator?.visibility = View.GONE
+                }
+            }
+
+            override fun onLost(network: Network) {
+                // Síť ztracena, zobrazíme banner
+                runOnUiThread {
+                    offlineIndicator?.visibility = View.VISIBLE
+                }
+            }
+        }
+
+        // 4. Zkontrolujeme počáteční stav sítě
+        checkInitialNetworkState()
+    }
+
+    private fun checkInitialNetworkState() {
+        // Zkontrolujeme aktuální stav sítě při spuštění
+        val activeNetwork = connectivityManager.activeNetwork
+        if (activeNetwork == null) {
+            offlineIndicator?.visibility = View.VISIBLE
+        } else {
+            offlineIndicator?.visibility = View.GONE
+        }
+    }
 
 
     // ✨ UPRAVENO: Nastavení master settings - skrývá celou sekci pro běžné uživatele
@@ -311,7 +396,7 @@ class MainActivity : AppCompatActivity() {
                                 updateHideFromMasterList(user.uid, isChecked)
                             }
 
-                            Log.d(tag, "✅ Master switch nastaven: hideFromList=$hideFromList, clickable=${'$'}{switchView.isClickable}, enabled=${'$'}{switchView.isEnabled}")
+                            Log.d(tag, "✅ Master switch nastaven: hideFromList=$hideFromList, clickable=${switchView.isClickable}, enabled=${switchView.isEnabled}")
                         } else {
                             Log.e(tag, "❌ Switch nebyl nalezen v actionView")
                         }
@@ -362,7 +447,7 @@ class MainActivity : AppCompatActivity() {
             outputStream = FileOutputStream(destinationFile)
             if (inputStream != null) {
                 inputStream.copyTo(outputStream)
-                Log.d(tag, "Obrázek zkopírován do: ${'$'}{destinationFile.absolutePath}")
+                Log.d(tag, "Obrázek zkopírován do: ${destinationFile.absolutePath}")
                 return destinationFile.absolutePath
             } else {
                 Log.e(tag, "Nepodařilo se otevřít InputStream pro URI: $sourceUri")
@@ -392,7 +477,7 @@ class MainActivity : AppCompatActivity() {
         val shouldHideBell = destination.id in hideBellOnDestinations
 
         notificationMenuItem?.isVisible = !shouldHideBell
-        Log.d(tag, "Viditelnost zvonečku nastavena na: ${'$'}{!shouldHideBell}")
+        Log.d(tag, "Viditelnost zvonečku nastavena na: ${!shouldHideBell}")
 
         updateBadgeVisibility()
     }
@@ -402,19 +487,19 @@ class MainActivity : AppCompatActivity() {
             try {
                 notificationBadge?.let { badge ->
                     val shouldShowBadge = (notificationMenuItem?.isVisible == true) && hasUnreadNotifications
-                    Log.d(tag, "updateBadgeVisibility (v post): shouldShowBadge = $shouldShowBadge (iconVisible=${'$'}{notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
+                    Log.d(tag, "updateBadgeVisibility (v post): shouldShowBadge = $shouldShowBadge (iconVisible=${notificationMenuItem?.isVisible}, hasUnread=$hasUnreadNotifications)")
 
                     BadgeUtils.detachBadgeDrawable(badge, toolbar, R.id.action_notifications)
 
                     if (shouldShowBadge) {
                         BadgeUtils.attachBadgeDrawable(badge, toolbar, R.id.action_notifications)
-                        Log.d(tag, "Badge připojen s počtem: ${'$'}{badge.number}")
+                        Log.d(tag, "Badge připojen s počtem: ${badge.number}")
                     } else {
                         Log.d(tag, "Badge zůstává odpojen.")
                     }
                 }
             } catch (_: Exception) {
-                Log.w(tag, "Chyba při (od)připojování badge: ${'$'}{e.message}")
+
             }
         }
     }
@@ -510,7 +595,7 @@ class MainActivity : AppCompatActivity() {
                     // ✨ NOVÉ: Smaž FCM token při odhlášení
                     val currentUser = Firebase.auth.currentUser
                     if (currentUser != null) {
-                        Log.d(tag, "Mazání FCM tokenu pro uživatele: ${'$'}{currentUser.uid}")
+                        Log.d(tag, "Mazání FCM tokenu pro uživatele: ${currentUser.uid}")
                         db.collection("users").document(currentUser.uid)
                             .update("fcmToken", com.google.firebase.firestore.FieldValue.delete())
                             .addOnSuccessListener {
@@ -674,7 +759,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadGoogleOrDefaultImage(imageView: ImageView, user: com.google.firebase.auth.FirebaseUser) {
         if (user.photoUrl != null) {
-            Log.d(tag, "Načítám profilový obrázek z Google URL pro ${'$'}{user.uid}")
+            Log.d(tag, "Načítám profilový obrázek z Google URL pro ${user.uid}")
             imageView.load(user.photoUrl) {
                 crossfade(true)
                 placeholder(R.drawable.ic_profile)

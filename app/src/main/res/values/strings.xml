@@ -225,6 +225,7 @@
 
     <!-- Location item -->
     <string name="meter_count_format">Počet měřáků: %d</string>
+    <string name="you_are_offline">Jste offline</string>
 
 
     <string-array name="months_array">

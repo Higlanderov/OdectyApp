@@ -44,6 +44,15 @@ class MasterUserListFragment : Fragment() {
 
     private var pendingExportFormat: String? = null
 
+    // === ZAČÁTEK ÚPRAVY (Flag pro reset filtru) ===
+    /**
+     * Tento flag zajišťuje, že filtr resetujeme při návratu z navigace
+     * (např. z detailu uživatele), ale ne při návratu z dialogu
+     * (např. z výběru souboru pro export).
+     */
+    private var shouldResetFilterOnResume = true
+    // === KONEC ÚPRAVY ===
+
     private val createFileLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -136,6 +145,23 @@ class MasterUserListFragment : Fragment() {
         return binding.root
     }
 
+    // === ZAČÁTEK ÚPRAVY (Přidání onResume) ===
+    override fun onResume() {
+        super.onResume()
+        // Resetuje filtr při každém návratu na obrazovku (kromě návratu z dialogů)
+        if (shouldResetFilterOnResume) {
+            Log.d("MasterUserListFragment", "onResume: Resetting filter")
+            binding.searchEditText.setText("")
+            setupFilterSpinners() // Resetuje i výběry ve spinnerech
+            viewModel.resetFilter()
+            binding.filterCard.isVisible = false
+        }
+
+        // Flag vrátíme zpět na true pro příští navigaci
+        shouldResetFilterOnResume = true
+    }
+    // === KONEC ÚPRAVY ===
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
@@ -151,7 +177,7 @@ class MasterUserListFragment : Fragment() {
         // ✨ === KONEC OPRAVY NAVIGACE ===
 
         setupRecyclerView()
-        setupFilterSpinners()
+        setupFilterSpinners() // Původní nastavení spinnerů zůstává zde
 
         viewModel.filteredUsersWithStatus.observe(viewLifecycleOwner) { userList ->
             userAdapter.submitList(userList)
@@ -282,6 +308,12 @@ class MasterUserListFragment : Fragment() {
 
     private fun createFile(format: String) {
         Log.d("MasterUserListFragment", "createFile called with format: $format")
+
+        // === ZAČÁTEK ÚPRAVY ===
+        // Řekneme fragmentu, aby neresetoval filtr, až se vrátíme z file pickeru
+        shouldResetFilterOnResume = false
+        // === KONEC ÚPRAVY ===
+
         pendingExportFormat = format
 
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {

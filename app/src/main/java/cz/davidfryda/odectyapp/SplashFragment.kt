@@ -23,6 +23,8 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
             val currentUser = Firebase.auth.currentUser
             if (currentUser != null) {
                 try {
+                    // Díky perzistenci (v OdectyApplication) se tento dotaz pokusí
+                    // načíst data z cache, pokud jsme offline.
                     val userDoc = Firebase.firestore.collection("users").document(currentUser.uid).get().await()
                     val isMaster = userDoc.getString("role") == "master"
 
@@ -32,7 +34,13 @@ class SplashFragment : Fragment(R.layout.fragment_splash) {
                         findNavController().navigate(R.id.action_splashFragment_to_locationListFragment)
                     }
                 } catch (_: Exception) {
-                    findNavController().navigate(R.id.action_splashFragment_to_loginFragment)
+                    // === ZAČÁTEK ÚPRAVY ===
+                    // Původní kód zde navigoval na loginFragment.
+                    // Nově: Pokud jsme se dostali sem, znamená to, že currentUser != null,
+                    // ale selhalo načtení role (např. jsme offline a role není v cache).
+                    // Místo na login navigujeme do hlavní části aplikace.
+                    findNavController().navigate(R.id.action_splashFragment_to_locationListFragment)
+                    // === KONEC ÚPRAVY ===
                 }
             } else {
                 findNavController().navigate(R.id.action_splashFragment_to_loginFragment)

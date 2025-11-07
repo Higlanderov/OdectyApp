@@ -5,9 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [OfflineReading::class], version = 1, exportSchema = false)
+// ✨ OPRAVA: Přidána 'PendingDeletion::class' a zvýšena verze (např. z 1 na 2)
+@Database(entities = [OfflineReading::class, PendingDeletion::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
+
     abstract fun readingDao(): ReadingDao
+
+    // ✨ OPRAVA: Přidána abstraktní funkce pro nové DAO
+    abstract fun pendingDeletionDao(): PendingDeletionDao
 
     companion object {
         @Volatile
@@ -19,7 +24,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "odecty_database"
-                ).build()
+                )
+                    // ✨ OPRAVA: Přidána migrace, pokud měníte verzi existující databáze
+                    .fallbackToDestructiveMigration() // Jednoduchá migrace, smaže stará data
+                    .build()
                 INSTANCE = instance
                 instance
             }

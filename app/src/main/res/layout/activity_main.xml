@@ -7,31 +7,40 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <!-- Hlavní obsah aplikace -->
-    <LinearLayout
+    <RelativeLayout
         android:id="@+id/main_content_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
-        <!-- Horní lišta (Toolbar) -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize" />
+            android:layout_height="?attr/actionBarSize"
+            android:layout_alignParentTop="true" />
 
-        <!-- Kontejner pro fragmenty -->
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/nav_host_fragment"
             android:name="androidx.navigation.fragment.NavHostFragment"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:layout_below="@id/toolbar"
             app:defaultNavHost="true"
             app:navGraph="@navigation/nav_graph" />
 
-    </LinearLayout>
+        <TextView
+            android:id="@+id/textViewOfflineIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:background="#D32F2F"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="@string/you_are_offline"
+            android:textColor="@android:color/white"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
-    <!-- Samotné vysouvací menu -->
+    </RelativeLayout>
     <com.google.android.material.navigation.NavigationView
         android:id="@+id/nav_view"
         android:layout_width="wrap_content"
