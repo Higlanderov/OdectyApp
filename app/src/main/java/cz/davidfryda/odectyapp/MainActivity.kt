@@ -293,8 +293,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // Registrujeme callback při návratu do aktivity
         networkCallback?.let {
-            val networkRequest = NetworkRequest.Builder().build()
-            connectivityManager.registerNetworkCallback(networkRequest, it)
+            // ZMĚNA: Sledujeme pouze VÝCHOZÍ síť (tu, která má reálně internet),
+            // a ne všechny sítě (což způsobovalo chybu při přepínání WiFi/Data).
+            connectivityManager.registerDefaultNetworkCallback(it)
         }
     }
 
