@@ -88,10 +88,13 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
             }
 
             val iconRes = when (meter.type) {
-                "Plyn" -> R.drawable.ic_meter_gas
-                "Voda" -> R.drawable.ic_meter_water
                 "Elektřina" -> R.drawable.ic_meter_electricity
-                else -> R.drawable.ic_launcher_foreground
+                "Plyn" -> R.drawable.ic_meter_gas
+                "Voda teplá" -> R.drawable.ic_meter_water_hot
+                "Voda studená" -> R.drawable.ic_meter_water_cold
+                "Teplo" -> R.drawable.ic_heating
+                // "Ostatní" a cokoli jiného použije výchozí ikonu
+                else -> R.drawable.ic_meter
             }
             binding.meterIcon.setImageResource(iconRes)
 
@@ -105,12 +108,12 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     val locationId = currentLocationId ?: meter.locationId
 
                     if (locationId.isBlank()) {
-                        Log.e("MeterAdapter", "Cannot navigate, locationId is blank for meter: ${'$'}{meter.id}")
+                        Log.e("MeterAdapter", "Cannot navigate, locationId is blank for meter: ${meter.id}")
                         Toast.makeText(itemView.context, "Chyba: Chybí ID lokace.", Toast.LENGTH_SHORT).show()
                         return@setOnClickListener
                     }
 
-                    Log.d("MeterAdapter", "Navigating to MeterDetail (meterId: ${'$'}{meter.id}, userId: $ownerId, locationId: $locationId)")
+                    Log.d("MeterAdapter", "Navigating to MeterDetail (meterId: ${meter.id}, userId: $ownerId, locationId: $locationId)")
 
                     // Navigace se liší podle toho, zda jsme v kontextu mastera nebo běžného uživatele.
                     // Pro zjednodušení použijeme jednu akci, která zvládne oba případy.
@@ -124,7 +127,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     navController.navigate(action)
 
                 } catch (e: Exception) {
-                    Log.e("MeterAdapter", "Navigation failed for meter ${'$'}{meter.id}", e)
+                    Log.e("MeterAdapter", "Navigation failed for meter ${meter.id}", e)
                     Toast.makeText(itemView.context, "Chyba navigace.", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -134,17 +137,17 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
             val popup = PopupMenu(view.context, view)
 
             if (ownerId != null && isMasterOwnProfile) {
-                Log.d("MeterAdapter", "Showing user menu for master's own meter: ${'$'}{currentMeter.id}")
+                Log.d("MeterAdapter", "Showing user menu for master's own meter: ${currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_edit_meter -> {
-                            Log.d("MeterAdapter", "Edit meter clicked for master's own meter: ${'$'}{currentMeter.id}")
+                            Log.d("MeterAdapter", "Edit meter clicked for master's own meter: ${currentMeter.id}")
                             listener?.onEditMeterClicked(currentMeter)
                             true
                         }
                         R.id.action_delete_meter -> {
-                            Log.d("MeterAdapter", "Delete meter clicked for master's own meter: ${'$'}{currentMeter.id}")
+                            Log.d("MeterAdapter", "Delete meter clicked for master's own meter: ${currentMeter.id}")
                             listener?.onDeleteMeterClicked(currentMeter)
                             true
                         }
@@ -152,12 +155,12 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     }
                 }
             } else if (ownerId != null) {
-                Log.d("MeterAdapter", "Showing master menu for other user's meter: ${'$'}{currentMeter.id}")
+                Log.d("MeterAdapter", "Showing master menu for other user's meter: ${currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.master_meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_add_description -> {
-                            Log.d("MeterAdapter", "Add description clicked for meter: ${'$'}{currentMeter.id}, owner: $ownerId")
+                            Log.d("MeterAdapter", "Add description clicked for meter: ${currentMeter.id}, owner: $ownerId")
                             listener?.onAddDescriptionClicked(currentMeter, ownerId)
                             true
                         }
@@ -165,17 +168,17 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     }
                 }
             } else {
-                Log.d("MeterAdapter", "Showing user menu for meter: ${'$'}{currentMeter.id}")
+                Log.d("MeterAdapter", "Showing user menu for meter: ${currentMeter.id}")
                 popup.menuInflater.inflate(R.menu.meter_options_menu, popup.menu)
                 popup.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         R.id.action_edit_meter -> {
-                            Log.d("MeterAdapter", "Edit meter clicked for meter: ${'$'}{currentMeter.id}")
+                            Log.d("MeterAdapter", "Edit meter clicked for meter: ${currentMeter.id}")
                             listener?.onEditMeterClicked(currentMeter)
                             true
                         }
                         R.id.action_delete_meter -> {
-                            Log.d("MeterAdapter", "Delete meter clicked for meter: ${'$'}{currentMeter.id}")
+                            Log.d("MeterAdapter", "Delete meter clicked for meter: ${currentMeter.id}")
                             listener?.onDeleteMeterClicked(currentMeter)
                             true
                         }

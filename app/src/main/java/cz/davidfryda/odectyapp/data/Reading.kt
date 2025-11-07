@@ -9,6 +9,7 @@ data class Reading(
     val userId: String = "",
     val finalValue: Double? = null,
     val photoUrl: String = "",
+    val photoStoragePath: String = "",
     @ServerTimestamp
     val timestamp: Date? = null,
     // NOVÉ POLE:

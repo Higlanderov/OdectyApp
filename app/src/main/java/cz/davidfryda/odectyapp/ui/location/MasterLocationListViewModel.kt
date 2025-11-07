@@ -8,13 +8,17 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 import cz.davidfryda.odectyapp.data.Location
+import cz.davidfryda.odectyapp.data.Reading // Import pro datovou třídu Reading
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.net.URLDecoder // ✨ OPRAVA: Přidán import pro dekódování cesty
 
 class MasterLocationListViewModel : ViewModel() {
     private val db = Firebase.firestore
-    private val tag = "MasterLocationListVM" // Změněn tag
+    private val storage = Firebase.storage
+    private val tag = "MasterLocationListVM"
 
     private val _locations = MutableLiveData<List<Location>>()
     val locations: LiveData<List<Location>> = _locations
@@ -35,7 +39,6 @@ class MasterLocationListViewModel : ViewModel() {
      * Načte lokace pro konkrétního uživatele (režim Master).
      */
     fun loadLocationsForUser(userId: String) {
-        // Zde už není fallback, userId je povinné
         this.targetUserId = userId
         Log.d(tag, "Načítám lokace pro uživatele: $userId")
 
@@ -83,9 +86,7 @@ class MasterLocationListViewModel : ViewModel() {
         }
     }
 
-    // Funkce pro mazání a nastavení výchozí jsou stejné,
-    // jen musíme zajistit, že používají `targetUserId`
-
+    // Funkce pro kaskádové mazání (opravená)
     fun deleteLocation(locationId: String) {
         if (targetUserId == null) {
             _deleteResult.value = LocationListViewModel.DeleteResult.Error("User ID není nastaveno")
@@ -94,40 +95,91 @@ class MasterLocationListViewModel : ViewModel() {
 
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val metersSnapshot = db.collection("users")
-                    .document(targetUserId!!)
-                    .collection("meters")
-                    .whereEqualTo("locationId", locationId)
-                    .get()
-                    .await()
+            val userId = targetUserId!!
+            Log.d(tag, "Zahájení kaskádového mazání pro lokaci $locationId u uživatele $userId")
 
-                if (metersSnapshot.size() > 0) {
-                    _deleteResult.value = LocationListViewModel.DeleteResult.Error(
-                        "Nelze smazat místo s měřáky."
-                    )
-                    _isLoading.value = false
-                    return@launch
+            try {
+                // Vytvoříme dávku pro mazání v databázi
+                val batch = db.batch()
+
+                // Krok 1: Najdi všechny měřáky v dané lokaci
+                val metersRef = db.collection("users").document(userId).collection("meters")
+                val metersSnapshot = metersRef.whereEqualTo("locationId", locationId).get().await()
+                Log.d(tag, "Nalezeno ${metersSnapshot.size()} měřáků k smazání.")
+
+                // Krok 2: Projdi všechny nalezené měřáky
+                for (meterDoc in metersSnapshot.documents) {
+                    val meterId = meterDoc.id
+                    Log.d(tag, "Zpracovávám měřák $meterId")
+
+                    // Krok 3: Najdi všechny odečty pro daný měřák
+                    val readingsRef = db.collection("readings")
+                    val readingsSnapshot = readingsRef.whereEqualTo("meterId", meterId).get().await()
+                    Log.d(tag, "Nalezeno ${readingsSnapshot.size()} odečtů pro měřák $meterId")
+
+                    // Krok 4: Smaž všechny fotky a přidej odečty do dávky
+                    for (readingDoc in readingsSnapshot.documents) {
+                        val reading = readingDoc.toObject(Reading::class.java)
+
+                        // KROK 4a: SMAZÁNÍ FOTKY (první)
+                        val photoUrl = reading?.photoUrl //
+
+                        if (photoUrl != null && photoUrl.isNotBlank()) {
+                            try {
+                                // ✨ OPRAVA: Extrahujeme čistou cestu z URL
+                                // Cesta je vše mezi "/o/" a "?alt=media"
+                                var pathToDelete = photoUrl.substringAfter("/o/").substringBefore("?alt=media")
+                                // Dekódujeme URL znaky (např. %2F -> /)
+                                pathToDelete = URLDecoder.decode(pathToDelete, "UTF-8")
+
+                                val photoRef = storage.reference.child(pathToDelete)
+                                photoRef.delete().await()
+                                Log.d(tag, "Fotka smazána ze Storage: $pathToDelete")
+                            } catch (_: Exception) {
+                                // Pokud URL nemá očekávaný formát, zkusíme ji použít jako přímou cestu
+                                try {
+                                    val photoRef = storage.reference.child(photoUrl)
+                                    photoRef.delete().await()
+                                    Log.d(tag, "Fotka smazána ze Storage (jako přímá cesta): $photoUrl")
+                                } catch (e2: Exception) {
+                                    Log.w(tag, "Fotku $photoUrl se nepodařilo smazat (možná neexistuje nebo má neznámý formát): ${e2.message}")
+                                }
+                            }
+                        }
+
+                        // KROK 4b: PŘIDÁNÍ ODEČTU DO DÁVKY
+                        batch.delete(readingDoc.reference)
+                        Log.d(tag, "Odečet ${readingDoc.id} přidán do dávky ke smazání")
+                    }
+
+                    // KROK 4c: PŘIDÁNÍ MĚŘÁKU DO DÁVKY
+                    batch.delete(meterDoc.reference)
+                    Log.d(tag, "Měřák $meterId přidán do dávky ke smazání")
                 }
 
-                db.collection("users")
-                    .document(targetUserId!!)
+                // Krok 5: Přidej lokaci do dávky ke smazání
+                val locationRef = db.collection("users")
+                    .document(userId)
                     .collection("locations")
                     .document(locationId)
-                    .delete()
-                    .await()
+                batch.delete(locationRef)
+                Log.d(tag, "Lokace $locationId přidána do dávky ke smazání")
 
-                Log.d(tag, "Location $locationId deleted for user $targetUserId")
+                // Krok 6: Spusť celou dávku
+                batch.commit().await()
+
+                Log.d(tag, "Kaskádové smazání pro lokaci $locationId úspěšně dokončeno.")
                 _deleteResult.value = LocationListViewModel.DeleteResult.Success
                 _isLoading.value = false
 
             } catch (e: Exception) {
-                Log.e(tag, "Error deleting location", e)
-                _deleteResult.value = LocationListViewModel.DeleteResult.Error(e.message ?: "Unknown error")
+                Log.e(tag, "Chyba při kaskádovém mazání lokace $locationId", e)
+                _deleteResult.value = LocationListViewModel.DeleteResult.Error(e.message ?: "Neznámá chyba při mazání")
                 _isLoading.value = false
             }
         }
     }
+
 
     fun setAsDefault(locationId: String) {
         if (targetUserId == null) {

@@ -28,20 +28,32 @@ class EditLocationViewModel : ViewModel() {
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
-    fun loadLocation(locationId: String) {
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
-            Log.e(tag, "User not logged in")
+    // ✨ OPRAVA: Sem si uložíme ID, se kterými budeme pracovat
+    private var targetUserId: String? = null
+    private var currentLocationId: String? = null
+
+    // ✨ OPRAVA: Funkce nyní přijímá 'userId' (který může být null)
+    fun loadLocation(userId: String?, locationId: String) {
+        // Pokud 'userId' přišel (master upravuje cizí), použijeme ten.
+        // Pokud je 'userId' null (uživatel upravuje své), vezmeme ID přihlášeného.
+        val uidToUse = userId ?: Firebase.auth.currentUser?.uid
+
+        if (uidToUse == null) {
+            Log.e(tag, "User not logged in and no userId provided")
             _location.value = null
             return
         }
 
+        // Uložíme si ID pro pozdější použití (v 'updateLocation')
+        this.targetUserId = uidToUse
+        this.currentLocationId = locationId
         _isLoading.value = true
 
         viewModelScope.launch {
             try {
+                // ✨ OPRAVA: Používáme 'uidToUse'
                 val doc = db.collection("users")
-                    .document(userId)
+                    .document(uidToUse)
                     .collection("locations")
                     .document(locationId)
                     .get()
@@ -50,18 +62,16 @@ class EditLocationViewModel : ViewModel() {
                 if (doc.exists()) {
                     val locationData = doc.toObject(Location::class.java)?.copy(id = doc.id)
                     _location.value = locationData
-
-                    // Načti počet měřáků
-                    loadMeterCount(userId, locationId)
+                    // Načteme počet měřáků pro správného uživatele
+                    loadMeterCount(uidToUse, locationId)
                 } else {
-                    Log.e(tag, "Location not found: $locationId")
+                    Log.e(tag, "Location not found: $locationId for user $uidToUse")
                     _location.value = null
                 }
-
                 _isLoading.value = false
 
             } catch (e: Exception) {
-                Log.e(tag, "Error loading location", e)
+                Log.e(tag, "Error loading location $locationId for user $uidToUse", e)
                 _location.value = null
                 _isLoading.value = false
             }
@@ -77,7 +87,6 @@ class EditLocationViewModel : ViewModel() {
                 .get()
                 .await()
                 .size()
-
             _meterCount.value = count
         } catch (e: Exception) {
             Log.e(tag, "Error loading meter count", e)
@@ -85,8 +94,8 @@ class EditLocationViewModel : ViewModel() {
         }
     }
 
+    // ✨ OPRAVA: Funkce už nepotřebuje ID jako argumenty, pamatuje si je
     fun updateLocation(
-        locationId: String,
         name: String,
         address: String,
         note: String,
@@ -97,15 +106,17 @@ class EditLocationViewModel : ViewModel() {
             _saveResult.value = SaveResult.Error("Název místa je povinný")
             return
         }
-
         if (address.isBlank()) {
             _saveResult.value = SaveResult.Error("Adresa je povinná")
             return
         }
 
-        val userId = Firebase.auth.currentUser?.uid
-        if (userId == null) {
-            _saveResult.value = SaveResult.Error("Uživatel není přihlášen")
+        // ✨ OPRAVA: Použijeme uložená ID
+        val userId = targetUserId
+        val locationId = currentLocationId
+
+        if (userId == null || locationId == null) {
+            _saveResult.value = SaveResult.Error("Chyba: Uživatel nebo lokace není specifikována.")
             return
         }
 
@@ -143,7 +154,7 @@ class EditLocationViewModel : ViewModel() {
                     .update(updates)
                     .await()
 
-                // Pokud je to výchozí, aktualizuj user dokument
+                // Pokud je to výchozí, aktualizuj i hlavní dokument uživatele
                 if (setAsDefault) {
                     db.collection("users")
                         .document(userId)
@@ -151,12 +162,12 @@ class EditLocationViewModel : ViewModel() {
                         .await()
                 }
 
-                Log.d(tag, "Location updated successfully: $locationId")
+                Log.d(tag, "Location updated successfully: $locationId for user $userId")
                 _saveResult.value = SaveResult.Success
                 _isLoading.value = false
 
             } catch (e: Exception) {
-                Log.e(tag, "Error updating location", e)
+                Log.e(tag, "Error updating location for user $userId", e)
                 _saveResult.value = SaveResult.Error(e.message ?: "Neznámá chyba")
                 _isLoading.value = false
             }

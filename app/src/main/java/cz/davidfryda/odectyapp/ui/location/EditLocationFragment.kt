@@ -37,83 +37,69 @@ class EditLocationFragment : Fragment() {
         setupUI()
         setupObservers()
 
-        // Načti data lokace
-        viewModel.loadLocation(args.locationId)
+        // ✨ OPRAVA: Předáme oba argumenty z navigace (včetně args.userId).
+        // Váš původní kód zde posílal pouze args.locationId.
+        viewModel.loadLocation(args.userId, args.locationId)
     }
 
     private fun setupUI() {
-        // Clear error při psaní
-        binding.locationNameEditText.doAfterTextChanged {
-            binding.locationNameLayout.error = null
+        // Kliknutí na tlačítko Uložit
+        binding.saveButton.setOnClickListener {
+            updateLocation()
         }
 
-        binding.locationAddressEditText.doAfterTextChanged {
-            binding.locationAddressLayout.error = null
-        }
-
-        // Tlačítko Zrušit
+        // ✨ OPRAVA: Přidáno volání pro tlačítko "Zrušit", které máte v XML
         binding.cancelButton.setOnClickListener {
             findNavController().navigateUp()
         }
 
-        // Tlačítko Uložit
-        binding.saveButton.setOnClickListener {
-            updateLocation()
+        // Automatické mazání chyb při psaní
+        binding.locationNameEditText.doAfterTextChanged {
+            binding.locationNameLayout.error = null
+        }
+        binding.locationAddressEditText.doAfterTextChanged {
+            binding.locationAddressLayout.error = null
         }
     }
 
     private fun setupObservers() {
+        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            // Skryjeme formulář a ukážeme ProgressBar při načítání
+            binding.progressBar.isVisible = isLoading
+            binding.formLayout.isVisible = !isLoading // Používáme ID z XML
+            binding.saveButton.isEnabled = !isLoading
+            binding.cancelButton.isEnabled = !isLoading
+        }
+
         viewModel.location.observe(viewLifecycleOwner) { location ->
             if (location != null) {
-                // Naplň formulář daty
+                // Vyplníme pole daty z ViewModelu
                 binding.locationNameEditText.setText(location.name)
                 binding.locationAddressEditText.setText(location.address)
                 binding.locationNoteEditText.setText(location.note)
                 binding.setAsDefaultSwitch.isChecked = location.isDefault
-
-                // Zobraz/skryj loading
-                binding.loadingLayout.isVisible = false
-                binding.formLayout.isVisible = true
             } else {
-                // Chyba načítání
-                Toast.makeText(
-                    context,
-                    R.string.error_loading_location,
-                    Toast.LENGTH_LONG
-                ).show()
-                findNavController().navigateUp()
+                // Pokud se lokace nenačte (a už neprobíhá načítání), zobrazíme chybu
+                if (viewModel.isLoading.value == false) {
+                    Toast.makeText(context, "Lokace nenalezena.", Toast.LENGTH_LONG).show()
+                    binding.saveButton.isEnabled = false
+                }
             }
         }
 
         viewModel.meterCount.observe(viewLifecycleOwner) { count ->
+            // ✨ OPRAVA: Posuvník se již neskrývá.
+            // Zobrazíme ho VŽDY.
+            binding.setAsDefaultSwitch.isVisible = true //
+
             if (count > 0) {
-                val text = when (count) {
-                    1 -> getString(R.string.location_has_one_meter)
-                    else -> getString(R.string.location_has_meters, count)
-                }
-                binding.meterInfoTextView.text = text
-                binding.meterInfoCard.isVisible = true
+                // Místo má měřáky, tak alespoň ukážeme informační kartu
+                binding.meterInfoCard.isVisible = true //
+                val meterText = if (count == 1) "1 měřák" else "$count měřáky"
+                binding.meterInfoTextView.text = "Toto místo má $meterText." //
             } else {
+                // Místo nemá měřáky, info kartu skryjeme
                 binding.meterInfoCard.isVisible = false
-            }
-        }
-
-        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
-            if (viewModel.location.value == null) {
-                // Zobraz loading state při prvním načítání
-                binding.loadingLayout.isVisible = isLoading
-                binding.formLayout.isVisible = !isLoading
-            } else {
-                // Zobraz progress bar při ukládání
-                binding.progressBar.isVisible = isLoading
-                binding.saveButton.isEnabled = !isLoading
-                binding.cancelButton.isEnabled = !isLoading
-
-                // Disable input fields during loading
-                binding.locationNameEditText.isEnabled = !isLoading
-                binding.locationAddressEditText.isEnabled = !isLoading
-                binding.locationNoteEditText.isEnabled = !isLoading
-                binding.setAsDefaultSwitch.isEnabled = !isLoading
             }
         }
 
@@ -145,23 +131,21 @@ class EditLocationFragment : Fragment() {
 
         // Validace na UI straně
         var hasError = false
-
         if (name.isBlank()) {
             binding.locationNameLayout.error = getString(R.string.location_name_required)
             hasError = true
         }
-
         if (address.isBlank()) {
             binding.locationAddressLayout.error = getString(R.string.address_required)
             hasError = true
         }
-
         if (hasError) {
             return
         }
 
-        // Zavolej ViewModel
-        viewModel.updateLocation(args.locationId, name, address, note, setAsDefault)
+        // ✨ OPRAVA: Zavoláme novou funkci ViewModelu (již nepotřebuje ID).
+        // Váš původní kód zde posílal args.locationId.
+        viewModel.updateLocation(name, address, note, setAsDefault)
     }
 
     override fun onDestroyView() {
