@@ -8,16 +8,16 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage // ✨ PŘIDÁN IMPORT
 import cz.davidfryda.odectyapp.data.Location
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.data.Reading
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.Calendar
-import java.util.Date
 
 class LocationDetailViewModel : ViewModel() {
     private val db = Firebase.firestore
+    private val storage = Firebase.storage // ✨ PŘIDÁNA PROMĚNNÁ
     private val tag = "LocationDetailViewModel"
 
     private val _location = MutableLiveData<Location?>()
@@ -52,7 +52,7 @@ class LocationDetailViewModel : ViewModel() {
                     Log.e(tag, "Location not found: $locationId")
                     _location.value = null
                 }
-                _isLoading.value = false
+                _isLoading.value = false // Přesunuto sem
             }
             .addOnFailureListener { e ->
                 Log.e(tag, "Error loading location", e)
@@ -192,9 +192,11 @@ class LocationDetailViewModel : ViewModel() {
         }
     }
 
+    // ✨ KOMPLETNĚ OPRAVENÁ METODA deleteMeter
     fun deleteMeter(userId: String, meterId: String) {
         viewModelScope.launch {
             try {
+                // Krok 1: Smazat dokument měřáku
                 db.collection("users")
                     .document(userId)
                     .collection("meters")
@@ -202,17 +204,36 @@ class LocationDetailViewModel : ViewModel() {
                     .delete()
                     .await()
 
+                // Krok 2: Najít všechny související odečty (OPRAVENÝ DOTAZ)
                 val readingsSnapshot = db.collection("readings")
+                    .whereEqualTo("userId", userId) // <-- ✨ OPRAVA (Řeší Permission Denied)
                     .whereEqualTo("meterId", meterId)
                     .get()
                     .await()
 
-                for (reading in readingsSnapshot.documents) {
-                    reading.reference.delete().await()
+                // Krok 3: Smazat každý odečet A JEHO FOTKU
+                for (readingDoc in readingsSnapshot.documents) {
+                    val readingData = readingDoc.toObject(Reading::class.java)
+
+                    // ✨ OPRAVA (Řeší mazání fotek)
+                    if (readingData != null && readingData.photoUrl.isNotBlank()) {
+                        try {
+                            // Získáme referenci ze známé URL
+                            val photoRef = storage.getReferenceFromUrl(readingData.photoUrl)
+                            photoRef.delete().await()
+                            Log.d(tag, "Photo deleted from Storage: ${readingData.photoUrl}")
+                        } catch (e: Exception) {
+                            Log.e(tag, "Error deleting photo from Storage", e)
+                            // Pokračujeme dál, i když se fotku smazat nepodaří
+                        }
+                    }
+
+                    // Smazat dokument odečtu z Firestore
+                    readingDoc.reference.delete().await()
                 }
 
-                Log.d(tag, "Meter deleted: $meterId (${readingsSnapshot.size()} readings)")
-                _deleteMeterResult.value = DeleteMeterResult.Success
+                Log.d(tag, "Meter deleted: $meterId (${readingsSnapshot.size()} readings deleted)")
+                _deleteMeterResult.value = DeleteMeterResult.Success // <-- Tento řádek by nyní měl být v pořádku
 
             } catch (e: Exception) {
                 Log.e(tag, "Error deleting meter", e)
