@@ -226,6 +226,8 @@
     <!-- Location item -->
     <string name="meter_count_format">Počet měřáků: %d</string>
     <string name="you_are_offline">Jste offline</string>
+    <string name="status_confirmed_format">✓ Potvrzeno (%1$d/%2$d)</string>
+    <string name="status_pending_format">⏳ Čekající (%1$d/%2$d)</string>
 
 
     <string-array name="months_array">

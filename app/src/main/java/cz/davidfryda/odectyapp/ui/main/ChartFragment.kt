@@ -1,6 +1,8 @@
 package cz.davidfryda.odectyapp.ui.main
 
+import android.graphics.Color // <-- PŘIDÁN IMPORT
 import android.os.Bundle
+import android.util.TypedValue // <-- PŘIDÁN IMPORT
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -58,7 +60,23 @@ class ChartFragment : Fragment() {
         }
     }
 
+    // === ZAČÁTEK ÚPRAVY (Nová pomocná funkce) ===
+    /**
+     * Získá barvu z aktuálního tématu (theme attribute).
+     */
+    private fun getThemeColor(attr: Int): Int {
+        val typedValue = TypedValue()
+        requireContext().theme.resolveAttribute(attr, typedValue, true)
+        return typedValue.data
+    }
+    // === KONEC ÚPRAVY ===
+
     private fun setupBarChart(readings: List<Reading>) {
+        // === ZAČÁTEK ÚPRAVY (Získání barev z tématu) ===
+        val textColor = getThemeColor(com.google.android.material.R.attr.colorOnSurface)
+        val gridColor = getThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+        // === KONEC ÚPRAVY ===
+
         val sortedReadings = readings.sortedBy { it.timestamp }
         val entries = sortedReadings.mapIndexed { index, reading ->
             BarEntry(index.toFloat(), reading.finalValue?.toFloat() ?: 0f)
@@ -67,6 +85,7 @@ class ChartFragment : Fragment() {
         val dataSet = BarDataSet(entries, "Historie odečtů").apply {
             color = requireContext().getColor(R.color.colorPrimary)
             valueTextSize = 10f
+            valueTextColor = textColor // <-- PŘIDÁNO
         }
 
         val xAxis = binding.detailBarChart.xAxis
@@ -76,12 +95,24 @@ class ChartFragment : Fragment() {
         xAxis.valueFormatter = IndexAxisValueFormatter(sortedReadings.map {
             it.timestamp?.let { date -> SimpleDateFormat("d.M", Locale.getDefault()).format(date) } ?: ""
         })
+        xAxis.textColor = textColor // <-- PŘIDÁNO
+        xAxis.axisLineColor = textColor // <-- PŘIDÁNO
 
         binding.detailBarChart.apply {
             data = BarData(dataSet)
             description.isEnabled = false
             axisRight.isEnabled = false
             legend.isEnabled = false
+
+            // === ZAČÁTEK ÚPRAVY (Nastavení barev os) ===
+            axisLeft.textColor = textColor
+            axisLeft.axisLineColor = textColor
+            axisLeft.gridColor = gridColor
+
+            legend.textColor = textColor
+            description.textColor = textColor
+            // === KONEC ÚPRAVY ===
+
             setFitBars(true)
             invalidate()
         }

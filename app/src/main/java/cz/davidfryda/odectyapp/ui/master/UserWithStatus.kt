@@ -4,5 +4,6 @@ import cz.davidfryda.odectyapp.data.UserData
 
 data class UserWithStatus(
     val user: UserData,
-    val hasReadingForCurrentMonth: Boolean
+    val readingsDone: Int,
+    val totalMeters: Int
 )

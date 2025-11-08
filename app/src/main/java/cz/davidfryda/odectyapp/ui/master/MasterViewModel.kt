@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModel
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.data.FullReadingData
-import cz.davidfryda.odectyapp.data.Location // ✨ PŘIDÁN IMPORT
+import cz.davidfryda.odectyapp.data.Location
 import cz.davidfryda.odectyapp.data.UserData
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.data.Reading
@@ -43,7 +43,7 @@ class MasterViewModel : ViewModel() {
     private var allUsers = mapOf<String, UserData>()
     private var allMeters = mapOf<String, Meter>()
     private var allReadings = listOf<Reading>()
-    private var allLocations = mapOf<String, Location>() // ✨ PŘIDÁNO: Mapa pro lokace
+    private var allLocations = mapOf<String, Location>()
 
     private val _filteredUsersWithStatus = MutableLiveData<List<UserWithStatus>>()
     val filteredUsersWithStatus: LiveData<List<UserWithStatus>> = _filteredUsersWithStatus
@@ -90,7 +90,7 @@ class MasterViewModel : ViewModel() {
             metersSnapshot?.let { snapshot ->
                 allMeters = snapshot.documents.mapNotNull { doc ->
                     doc.toObject(Meter::class.java)?.copy(id = doc.id)
-                }.associateBy { it.id }
+                }.associateBy { it.id } // Klíčem je meter.id
                 Log.d(tag, "Fetched ${allMeters.size} meters")
                 applyFilter()
             }
@@ -111,7 +111,7 @@ class MasterViewModel : ViewModel() {
             }
         }
 
-        // ✨ PŘIDÁNO: Načítání všech lokací
+        // Načítání všech lokací (beze změny)
         db.collectionGroup("locations").addSnapshotListener { locationsSnapshot, error ->
             if (error != null) {
                 Log.e(tag, "Error fetching locations", error)
@@ -142,12 +142,12 @@ class MasterViewModel : ViewModel() {
 
         Log.d(tag, "Applying filter: Search='$currentSearchText', Status=$currentStatusFilter, Month=$currentMonthFilter, Year=$currentYearFilter, Blocked=$currentBlockedFilter")
 
-        // Filtrování uživatelů (beze změny)
+        // Filtrování uživatelů podle jména a blokace (beze změny)
         val filteredUserIds = if (currentSearchText.isNotBlank()) {
             allUsers.values.filter { user ->
                 user.name.contains(currentSearchText, true) ||
                         user.surname.contains(currentSearchText, true) ||
-                        user.address.contains(currentSearchText, true) // Hledá i v hlavní adrese
+                        user.address.contains(currentSearchText, true)
             }.map { it.uid }.toSet()
         } else {
             allUsers.keys
@@ -160,28 +160,67 @@ class MasterViewModel : ViewModel() {
         }
 
         val calendar = Calendar.getInstance()
+
+        // === ZAČÁTEK OPRAVY LOGIKY STATUSU ===
+
+        // 1. Vytvoříme mapy lokací a měřáků pro efektivní propojení
+        val locationsByUser = allLocations.values.groupBy { it.userId }
+        val metersByLocation = allMeters.values.groupBy { it.locationId }
+
+        // 2. Vytvoříme Set (sadu) unikátních 'meterId' všech odečtů
+        //    provedených ve filtrovaném měsíci a roce. (Beze změny)
+        val readMeterIdsInMonth = allReadings.asSequence()
+            .filter { reading ->
+                calendar.time = reading.timestamp ?: Date(0)
+                calendar.get(Calendar.MONTH) == currentMonthFilter &&
+                        calendar.get(Calendar.YEAR) == currentYearFilter
+            }
+            .map { it.meterId }
+            .toSet()
+
+        // 3. Projdeme uživatele a spočítáme jejich stav (OPRAVENÁ LOGIKA)
         val usersWithStatus = allUsers.values
-            .filter { it.uid in filteredByBlocked }
+            .filter { it.uid in filteredByBlocked } // Použijeme již filtrované uživatele
             .map { user ->
-                val hasReading = allReadings.any { reading ->
-                    calendar.time = reading.timestamp ?: Date(0)
-                    reading.userId == user.uid &&
-                            calendar.get(Calendar.MONTH) == currentMonthFilter &&
-                            calendar.get(Calendar.YEAR) == currentYearFilter
+
+                // KROK 1: Najdeme všechny lokace patřící tomuto uživateli
+                val userLocations = locationsByUser[user.uid] ?: emptyList()
+
+                // KROK 2: Pro každou lokaci najdeme její měřáky a spojíme je do jednoho seznamu
+                val allUserMeters = userLocations.flatMap { location ->
+                    metersByLocation[location.id] ?: emptyList()
                 }
-                UserWithStatus(user, hasReading)
+
+                // KROK 3: Spoèítáme celkový počet měřáků
+                val totalMetersCount = allUserMeters.size
+
+                // KROK 4: Spoèítáme, kolik z nich bylo odečteno
+                val readingsDoneCount = allUserMeters.count { meter ->
+                    meter.id in readMeterIdsInMonth
+                }
+
+                // Vrátíme novou datovou třídu UserWithStatus
+                UserWithStatus(user, readingsDoneCount, totalMetersCount)
             }
 
+        // 4. Aplikujeme filtr (DONE, PENDING) podle nových pravidel
+        //    (Logika z minulé úpravy, nyní bude fungovat správně)
         val uiFinalList = when (currentStatusFilter) {
-            ReadingStatusFilter.DONE -> usersWithStatus.filter { it.hasReadingForCurrentMonth }
-            ReadingStatusFilter.PENDING -> usersWithStatus.filter { !it.hasReadingForCurrentMonth }
+            ReadingStatusFilter.DONE -> usersWithStatus.filter {
+                it.totalMeters > 0 && it.readingsDone == it.totalMeters
+            }
+            ReadingStatusFilter.PENDING -> usersWithStatus.filter {
+                it.readingsDone < it.totalMeters
+            }
             ReadingStatusFilter.ALL -> usersWithStatus
         }
+        // === KONEC OPRAVY LOGIKY STATUSU ===
+
         _filteredUsersWithStatus.value = uiFinalList.sortedBy { it.user.surname }
         Log.d(tag, "UI list size after status filter: ${uiFinalList.size}")
 
 
-        // --- ✨ OPRAVA PŘI SESTAVOVÁNÍ EXPORTU ---
+        // --- Sestavování exportu (BEZE ZMĚNY) ---
         val newExportableData = mutableListOf<FullReadingData>()
         val finalFilteredUserIdsForExport = uiFinalList.map { it.user.uid }.toSet()
 
@@ -193,19 +232,15 @@ class MasterViewModel : ViewModel() {
 
                 val user = allUsers[reading.userId]
                 val meter = allMeters[reading.meterId]
-                // ✨ ZÍSKÁME LOKACI ODBĚRNÉHO MÍSTA
                 val location = allLocations[meter?.locationId]
 
-                // ✨ KONTROLUJEME, ŽE MÁME VŠECHNA DATA
                 if (user != null && meter != null && location != null) {
-                    // Předáme do datové třídy i lokaci
                     newExportableData.add(FullReadingData(user, meter, reading, location))
                 } else {
                     Log.w(tag, "Skipping reading ${reading.id} for export: User, Meter or Location not found")
                 }
             }
         }
-        // --- ✨ KONEC OPRAVY ---
 
         exportableData = newExportableData.sortedWith(compareBy({ it.user.surname }, { it.reading?.timestamp }))
         Log.d(tag, "Exportable data size: ${exportableData.size}")
@@ -237,7 +272,6 @@ class MasterViewModel : ViewModel() {
 
     fun generateCsvContent(): String {
         Log.d(tag, "Generating CSV content for ${exportableData.size} records")
-        // ✨ OPRAVA: Hlavička "Adresa místa"
         val header = "Datum Odečtu,Jméno,Příjmení,Adresa místa,Měřák ID,Název Měřáku,Typ Měřáku,Popis Správce,Hodnota Odečtu,Jednotka\n"
         val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
         val rows = exportableData.joinToString(separator = "\n") { data ->
@@ -248,7 +282,6 @@ class MasterViewModel : ViewModel() {
             val meterName = data.meter?.name ?: ""
             val meterType = data.meter?.type ?: ""
             val masterDesc = data.meter?.masterDescription ?: ""
-            // ✨ OPRAVA: Použijeme adresu z lokace
             val address = data.location.address.replace("\"", "\"\"")
 
             "\"$date\",\"${data.user.name}\",\"${data.user.surname}\",\"$address\",\"$meterId\",\"$meterName\",\"$meterType\",\"$masterDesc\",\"$value\",\"$unit\""
@@ -262,7 +295,6 @@ class MasterViewModel : ViewModel() {
         val sheet = workbook.createSheet("Odečty")
         val headerRow = sheet.createRow(0)
 
-        // ✨ OPRAVA: Hlavička "Adresa místa"
         val headers = listOf("Datum Odečtu", "Jméno", "Příjmení", "Adresa místa", "Měřák ID", "Název Měřáku", "Typ Měřáku", "Popis Správce", "Hodnota Odečtu", "Jednotka")
         headers.forEachIndexed { index, header ->
             headerRow.createCell(index).setCellValue(header)
@@ -273,7 +305,6 @@ class MasterViewModel : ViewModel() {
             dataRow.createCell(0).setCellValue(data.reading?.timestamp?.let { dateFormat.format(it) } ?: "")
             dataRow.createCell(1).setCellValue(data.user.name)
             dataRow.createCell(2).setCellValue(data.user.surname)
-            // ✨ OPRAVA: Použijeme adresu z lokace
             dataRow.createCell(3).setCellValue(data.location.address)
             dataRow.createCell(4).setCellValue(data.meter?.id ?: "")
             dataRow.createCell(5).setCellValue(data.meter?.name ?: "")
@@ -343,20 +374,11 @@ class MasterViewModel : ViewModel() {
                     val imageBytes = photoRef.getBytes(Long.MAX_VALUE).await()
                     Log.d(tag, "  -> Downloaded ${imageBytes.size} bytes")
 
-                    // ✨ --- OPRAVA NÁZVU SOUBORU ---
-                    // 1. Získáme jméno a příjmení, odstraníme diakritiku a mezery
                     val userName = "${data.user.name}_${data.user.surname}"
                         .replace("[^a-zA-Z0-9_]".toRegex(), "")
-
-                    // 2. Získáme adresu lokace, odstraníme diakritiku a mezery
                     val address = data.location.address.replace("[^a-zA-Z0-9]".toRegex(), "_")
-
-                    // 3. Získáme datum
                     val timestamp = reading.timestamp?.let { dateFormat.format(it) } ?: "bez_data"
-
-                    // 4. Sestavíme název
                     val fileName = "${userName}_${address}_${timestamp}.jpg"
-                    // ✨ --- KONEC OPRAVY ---
 
                     val zipEntry = ZipEntry(fileName)
                     zipOutputStream.putNextEntry(zipEntry)
