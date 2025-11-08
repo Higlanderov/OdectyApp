@@ -5,12 +5,16 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import cz.davidfryda.odectyapp.data.Location
 import cz.davidfryda.odectyapp.data.Meter
+import cz.davidfryda.odectyapp.data.Reading
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Calendar
+import java.util.Date
 
 class LocationDetailViewModel : ViewModel() {
     private val db = Firebase.firestore
@@ -57,6 +61,7 @@ class LocationDetailViewModel : ViewModel() {
             }
     }
 
+    // ✨ UPRAVENÁ METODA: Načítá měřáky včetně posledních odečtů
     fun loadMeters(userId: String, locationId: String) {
         db.collection("users")
             .document(userId)
@@ -70,15 +75,48 @@ class LocationDetailViewModel : ViewModel() {
                 }
 
                 if (snapshot != null) {
-                    val metersList = snapshot.documents.mapNotNull { doc ->
-                        doc.toObject(Meter::class.java)?.copy(id = doc.id)
+                    viewModelScope.launch {
+                        val metersList = snapshot.documents.mapNotNull { doc ->
+                            doc.toObject(Meter::class.java)?.copy(id = doc.id)
+                        }
+
+                        // ✨ NOVÉ: Načíst poslední odečet pro každý měřák
+                        val metersWithReadings = metersList.map { meter ->
+                            val lastReading = getLastReadingForMeter(userId, meter.id)
+                            meter.copy(lastReading = lastReading)
+                        }
+
+                        _meters.value = metersWithReadings
+                        Log.d(tag, "Loaded ${metersWithReadings.size} meters with readings for location $locationId")
                     }
-                    _meters.value = metersList
-                    Log.d(tag, "Loaded ${metersList.size} meters for location $locationId")
                 } else {
                     _meters.value = emptyList()
                 }
             }
+    }
+
+    // ✨ NOVÁ METODA: Získá poslední odečet pro měřák
+    private suspend fun getLastReadingForMeter(userId: String, meterId: String): Reading? {
+        return try {
+            val snapshot = db.collection("readings")
+                .whereEqualTo("userId", userId)
+                .whereEqualTo("meterId", meterId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(1)
+                .get()
+                .await()
+
+            if (!snapshot.isEmpty) {
+                snapshot.documents[0].toObject(Reading::class.java)?.copy(
+                    id = snapshot.documents[0].id
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error fetching last reading for meter $meterId", e)
+            null
+        }
     }
 
     fun deleteLocation(userId: String, locationId: String) {
@@ -198,8 +236,8 @@ class LocationDetailViewModel : ViewModel() {
     }
 
     sealed class DeleteMeterResult {
-        object Idle : DeleteMeterResult() // <-- Opraveno
-        object Success : DeleteMeterResult() // <-- Opraveno
-        data class Error(val message: String) : DeleteMeterResult() // <-- Opraveno
+        object Idle : DeleteMeterResult()
+        object Success : DeleteMeterResult()
+        data class Error(val message: String) : DeleteMeterResult()
     }
 }

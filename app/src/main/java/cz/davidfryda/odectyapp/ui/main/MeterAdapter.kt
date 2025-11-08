@@ -1,11 +1,14 @@
 package cz.davidfryda.odectyapp.ui.main
 
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.navigation.findNavController
 import androidx.recyclerview.widget.DiffUtil
@@ -15,6 +18,8 @@ import cz.davidfryda.odectyapp.R
 import cz.davidfryda.odectyapp.data.Meter
 import cz.davidfryda.odectyapp.databinding.ListItemMeterBinding
 import cz.davidfryda.odectyapp.ui.location.LocationDetailFragmentDirections
+import java.util.Calendar
+import java.util.Date
 
 /**
  * Listener pro interakce s položkou měřáku v RecyclerView.
@@ -31,8 +36,6 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
     var ownerId: String? = null
     var isMasterOwnProfile: Boolean = false
     var listener: MeterInteractionListener? = null
-
-    // ✨ NOVÉ: LocationId pro navigaci
     var currentLocationId: String? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MeterViewHolder {
@@ -49,7 +52,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
         private val listener: MeterInteractionListener?,
         private val ownerId: String?,
         private val isMasterOwnProfile: Boolean,
-        private val currentLocationId: String? // ✨ NOVÝ parametr
+        private val currentLocationId: String?
     ) : RecyclerView.ViewHolder(binding.root) {
 
         private lateinit var currentMeter: Meter
@@ -67,6 +70,7 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
         fun bind(meter: Meter) {
             currentMeter = meter
 
+            // Nastavení názvu měřáku (podle master režimu)
             if (ownerId != null) {
                 if (isMasterOwnProfile) {
                     binding.meterName.text = meter.name
@@ -87,24 +91,25 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                 binding.meterOptionsMenuButton.isVisible = true
             }
 
+            // Nastavení ikony podle typu
             val iconRes = when (meter.type) {
                 "Elektřina" -> R.drawable.ic_meter_electricity
                 "Plyn" -> R.drawable.ic_meter_gas
                 "Voda teplá" -> R.drawable.ic_meter_water_hot
                 "Voda studená" -> R.drawable.ic_meter_water_cold
                 "Teplo" -> R.drawable.ic_heating
-                // "Ostatní" a cokoli jiného použije výchozí ikonu
                 else -> R.drawable.ic_meter
             }
             binding.meterIcon.setImageResource(iconRes)
 
-            binding.lastReadingStatus.text = itemView.context.getString(R.string.click_for_detail)
+            // ✨ NOVÉ: Zobrazení statusu posledního odečtu
+            setReadingStatus(meter)
 
+            // Kliknutí na položku - navigace na detail
             itemView.setOnClickListener {
                 val navController = itemView.findNavController()
 
                 try {
-                    // Použijeme currentLocationId pokud je k dispozici, jinak fallback na meter.locationId
                     val locationId = currentLocationId ?: meter.locationId
 
                     if (locationId.isBlank()) {
@@ -115,15 +120,11 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
 
                     Log.d("MeterAdapter", "Navigating to MeterDetail (meterId: ${meter.id}, userId: $ownerId, locationId: $locationId)")
 
-                    // Navigace se liší podle toho, zda jsme v kontextu mastera nebo běžného uživatele.
-                    // Pro zjednodušení použijeme jednu akci, která zvládne oba případy.
-                    // Předpokládáme, že navigační graf má globální akci nebo že jsme ve fragmentu, který ji definuje.
-                    // V tomto případě je `LocationDetailFragmentDirections` bezpečnější, protože `LocationDetailFragment` zůstal.
                     val action = LocationDetailFragmentDirections.actionLocationDetailFragmentToMeterDetailFragment(
-                            meterId = meter.id,
-                            userId = ownerId,  // Bude null pro běžného uživatele, což je správně
-                            locationId = locationId
-                        )
+                        meterId = meter.id,
+                        userId = ownerId,
+                        locationId = locationId
+                    )
                     navController.navigate(action)
 
                 } catch (e: Exception) {
@@ -131,6 +132,51 @@ class MeterAdapter : ListAdapter<Meter, MeterAdapter.MeterViewHolder>(MeterDiffC
                     Toast.makeText(itemView.context, "Chyba navigace.", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+
+        // ✨ NOVÁ METODA: Nastavení statusu odečtu
+        private fun setReadingStatus(meter: Meter) {
+            val lastReading = meter.lastReading
+
+            if (lastReading == null) {
+                // Žádný odečet
+                binding.lastReadingStatus.text = "Bez odečtu"
+                binding.lastReadingStatus.setTextColor(
+                    ContextCompat.getColor(itemView.context, android.R.color.darker_gray)
+                )
+            } else {
+                // Kontrola, zda je odečet z aktuálního měsíce
+                val isCurrentMonth = isReadingFromCurrentMonth(lastReading.timestamp)
+
+                if (isCurrentMonth) {
+                    // Potvrzený odečet (z aktuálního měsíce)
+                    binding.lastReadingStatus.text = "✓ Potvrzeno"
+                    binding.lastReadingStatus.setTextColor(
+                        Color.parseColor("#006400") // Tmavě zelená
+                    )
+                } else {
+                    // Čekající odečet (starší než aktuální měsíc)
+                    binding.lastReadingStatus.text = "⏳ Čekající"
+                    binding.lastReadingStatus.setTextColor(
+                        Color.parseColor("#FF8C00") // Tmavě oranžová
+                    )
+                }
+            }
+        }
+
+        // ✨ NOVÁ METODA: Kontrola, zda je odečet z aktuálního měsíce
+        private fun isReadingFromCurrentMonth(timestamp: Date?): Boolean {
+            if (timestamp == null) return false
+
+            val calendar = Calendar.getInstance()
+            val currentMonth = calendar.get(Calendar.MONTH)
+            val currentYear = calendar.get(Calendar.YEAR)
+
+            calendar.time = timestamp
+            val readingMonth = calendar.get(Calendar.MONTH)
+            val readingYear = calendar.get(Calendar.YEAR)
+
+            return currentMonth == readingMonth && currentYear == readingYear
         }
 
         private fun showPopupMenu(view: View) {
