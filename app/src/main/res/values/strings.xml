@@ -228,6 +228,13 @@
     <string name="you_are_offline">Jste offline</string>
     <string name="status_confirmed_format">✓ Potvrzeno (%1$d/%2$d)</string>
     <string name="status_pending_format">⏳ Čekající (%1$d/%2$d)</string>
+    <!-- Password reset -->
+    <string name="forgot_password">Zapomenuté heslo?</string>
+    <string name="password_reset_title">Obnovení hesla</string>
+    <string name="password_reset_info">Zadejte svůj e-mail a my Vám pošleme odkaz pro obnovu hesla.</string>
+    <string name="send">Odeslat</string>
+    <string name="password_reset_success">Odkaz pro obnovu hesla byl odeslán. Zkontrolujte prosím svůj e-mail.</string>
+    <string name="email">email@email.cz</string>
 
 
     <string-array name="months_array">

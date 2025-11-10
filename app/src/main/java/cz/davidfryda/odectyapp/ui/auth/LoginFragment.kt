@@ -48,7 +48,8 @@ class LoginFragment : Fragment() {
 
         binding.loginButton.setOnClickListener {
             val email = binding.emailEditText.text.toString().trim()
-            val password = binding.passwordEditText.text.toString().trim()
+            val password = binding.passwordEditText.text.toString().trim();
+
 
             if (email.isNotEmpty() && password.isNotEmpty()) {
                 viewModel.login(email, password)
@@ -62,8 +63,22 @@ class LoginFragment : Fragment() {
             signInWithGoogle()
         }
 
+        // ✨ NOVÉ: Kliknutí na Zapomenuté heslo
+        binding.forgotPasswordButton.setOnClickListener {
+            // Tato akce musí být definována v nav_graph.xml
+            findNavController().navigate(R.id.action_loginFragment_to_passwordResetFragment)
+        }
+
         viewModel.authResult.observe(viewLifecycleOwner) { result ->
             binding.progressBar.isVisible = result is AuthResult.Loading
+
+            // ✨ UPRAVENO: Zakázání tlačítek při načítání
+            val isLoading = result is AuthResult.Loading
+            binding.loginButton.isEnabled = !isLoading
+            binding.googleSignInButton.isEnabled = !isLoading
+            binding.registerPromptText.isEnabled = !isLoading
+            binding.forgotPasswordButton.isEnabled = !isLoading
+
 
             when (result) {
                 is AuthResult.Success -> {

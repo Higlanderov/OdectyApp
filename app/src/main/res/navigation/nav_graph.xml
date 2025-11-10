@@ -24,7 +24,21 @@
         <action
             android:id="@+id/action_loginFragment_to_locationListFragment"
             app:destination="@id/locationListFragment" />
+        <action
+            android:id="@+id/action_loginFragment_to_passwordResetFragment"
+            app:destination="@id/passwordResetFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
     </fragment>
+
+    <fragment
+        android:id="@+id/passwordResetFragment"
+        android:name="cz.davidfryda.odectyapp.ui.auth.PasswordResetFragment"
+        android:label="Obnovení hesla"
+        tools:layout="@layout/fragment_password_reset" />
+
 
     <fragment
         android:id="@+id/registerFragment"

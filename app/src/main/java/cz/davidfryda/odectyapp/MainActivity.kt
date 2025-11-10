@@ -92,7 +92,8 @@ class MainActivity : AppCompatActivity() {
             val authScreens = setOf(
                 R.id.loginFragment,
                 R.id.registerFragment,
-                R.id.splashFragment
+                R.id.splashFragment,
+                R.id.passwordResetFragment
             )
 
             if (currentDestination != null && currentDestination !in authScreens) {
